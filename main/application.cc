@@ -11,9 +11,6 @@
 #include "settings.h"
 #include "ota_server.h"
 #include "wifi_station.h"
-#include "sd_card.h"
-#include "esp32_sd_music.h"
-#include <qrcode.h>
 
 #include <cstring>
 #include <esp_log.h>
@@ -364,33 +361,10 @@ void Application::Start() {
     // Print board name/version info
     display->SetChatMessage("system", SystemInfo::GetUserAgent().c_str());
 
-#if (0) // Test QR code display
-    // Capture display pointer for callback
-    static Display* s_display = display;
-    esp_qrcode_config_t qrcode_cfg = {
-        .display_func = [](esp_qrcode_handle_t qrcode) {
-            if (s_display && qrcode) {
-                s_display->DisplayQRCode(qrcode, nullptr);
-            }
-        },
-        .max_qrcode_version = 10,
-        .qrcode_ecc_level = ESP_QRCODE_ECC_MED
-    };
-    
-    // Create URL format for QR code
-    std::string qr_text = "1234567890";
-    esp_err_t err = esp_qrcode_generate(&qrcode_cfg, qr_text.c_str());
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to generate test QR code");
-    }
-    return;
-#endif
-
     /* Setup the audio service */
     auto codec = board.GetAudioCodec();
     audio_service_.Initialize(codec);
     audio_service_.Start();
-    // codec->SetOutputVolume(10);
 
     AudioServiceCallbacks callbacks;
     callbacks.on_send_queue_available = [this]() {
@@ -408,7 +382,7 @@ void Application::Start() {
     xTaskCreate([](void* arg) {
         ((Application*)arg)->MainEventLoop();
         vTaskDelete(NULL);
-    }, "main_event_loop", 1024 * 3, this, 3, &main_event_loop_task_handle_);
+    }, "main_event_loop", 2048 * 4, this, 3, &main_event_loop_task_handle_);
 
     /* Start the clock timer to update the status bar */
     esp_timer_start_periodic(clock_timer_handle_, 1000000);
@@ -425,20 +399,6 @@ void Application::Start() {
     if (radio_ != nullptr) {
         radio_->Initialize();
     }
-
-#ifdef CONFIG_SD_CARD_ENABLE
-    auto sd_card = board.GetSdCard();
-    if (sd_card != nullptr) {
-        if (sd_card->Initialize() == ESP_OK) {
-            ESP_LOGI(TAG, "SD card mounted successfully");
-            sd_music_ = new Esp32SdMusic();
-            sd_music_->Initialize(sd_card);
-            sd_music_->loadTrackList();
-        } else {
-            ESP_LOGW(TAG, "Failed to mount SD card");
-        }
-    }
-#endif
 
     // Update the status bar immediately to show the network state
     display->UpdateStatusBar(true);
@@ -763,13 +723,8 @@ void Application::SetDeviceState(DeviceState state) {
                     STATE_STRINGS[previous_state], STATE_STRINGS[state]);
             radio_->Stop();
         }
-		if (sd_music_) {
-			ESP_LOGI(TAG, "Stopping SD music due to state change: %s -> %s",
-					 STATE_STRINGS[previous_state], STATE_STRINGS[state]);
-			sd_music_->stop();
-		}
-
         display->ClearQRCode();
+
     }																	   
     switch (state) {
         case kDeviceStateUnknown:

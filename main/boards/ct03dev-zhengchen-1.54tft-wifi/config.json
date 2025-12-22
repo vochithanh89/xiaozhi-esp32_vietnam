@@ -4,7 +4,6 @@
         {
             "name": "CT03Dev Assistant",
             "sdkconfig_append": [
-                "CONFIG_FLASH_CUSTOM_ASSETS=y",
                 "CONFIG_OTA_URL=\"https://api.tenclass.net/xiaozhi/ota/\"",
                 "CONFIG_FLASH_CUSTOM_ASSETS=y",
                 "CONFIG_CUSTOM_ASSETS_FILE=\"assets.bin\"",

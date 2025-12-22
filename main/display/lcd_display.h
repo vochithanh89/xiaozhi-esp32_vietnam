@@ -45,7 +45,6 @@ protected:
     esp_timer_handle_t preview_timer_ = nullptr;
     std::unique_ptr<LvglImage> preview_image_cached_ = nullptr;
     std::string ip_address_;
-	std::string music_info_;
 
     void InitializeLcdThemes();
     void SetupUI();
@@ -68,7 +67,6 @@ protected:
     float* fft_real;
     float* fft_imag;
     float* hanning_window_float;
-    uint16_t bar_max_hight_;
     void compute(float* real, float* imag, int n, bool forward);
     void drawSpectrumIfReady();
     uint16_t get_bar_color(int x_pos);
@@ -82,17 +80,6 @@ protected:
     lv_obj_t* canvas_ = nullptr;
     uint16_t* canvas_buffer_ = nullptr;
     void create_canvas(int32_t status_bar_height = 0);
-	
-	// --- UI phát nh?c trên canvas ---
-	lv_obj_t* music_root_        = nullptr;
-	lv_obj_t* music_date_label_  = nullptr;
-	lv_obj_t* music_title_label_ = nullptr;
-	lv_obj_t* music_bar_         = nullptr;   
-	lv_obj_t* music_time_left_   = nullptr;   
-	lv_obj_t* music_time_total_  = nullptr;  
-	lv_obj_t* music_subinfo_label_ = nullptr;
-	lv_obj_t* music_time_remain_ = nullptr;
-	lv_obj_t* music_next_line_ = nullptr;
 
     // Qr code handling methods
     bool qr_code_displayed_ = false;
@@ -106,16 +93,6 @@ protected:
     LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel, int width, int height);
     
 public:
-	// Lo?i ngu?n phát nh?c
-    enum class DisplaySourceType {
-        NONE = 0,
-        SD_CARD,
-        ONLINE,
-        RADIO
-    };
-    // Hàm nh?n di?n source
-    DisplaySourceType DetectSourceFromInfo() const;
-
     ~LcdDisplay();
     virtual void SetEmotion(const char* emotion) override;
     virtual void SetMusicInfo(const char* song_name) override;

@@ -12,12 +12,13 @@
 #include "backlight.h"
 #include "camera.h"
 #include "assets.h"
+#include "music.h"
+#include "radio.h"
+
 
 void* create_board();
 class AudioCodec;
 class Display;
-class LcdTouch;
-class SdCard;
 class Board {
 private:
     Board(const Board&) = delete; // Disable copy constructor
@@ -29,6 +30,7 @@ protected:
 
     // Software-generated unique device identifier
     std::string uuid_;
+
 public:
     static Board& GetInstance() {
         static Board* instance = static_cast<Board*>(create_board());
@@ -43,9 +45,9 @@ public:
     virtual AudioCodec* GetAudioCodec() = 0;
     virtual bool GetTemperature(float& esp32temp);
     virtual Display* GetDisplay();
-    virtual LcdTouch* GetTouch() { return nullptr; }
     virtual Camera* GetCamera();
-    virtual SdCard* GetSdCard();
+    virtual Music* GetMusic();
+    virtual Radio* GetRadio();
     virtual NetworkInterface* GetNetwork() = 0;
     virtual void StartNetwork() = 0;
     virtual const char* GetNetworkStateIcon() = 0;

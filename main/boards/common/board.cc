@@ -4,7 +4,8 @@
 #include "display/display.h"
 #include "display/oled_display.h"
 #include "assets/lang_config.h"
-#include "sd_card.h"
+#include "esp32_music.h"
+#include "esp32_radio.h"
 
 #include <esp_log.h>
 #include <esp_ota_ops.h>
@@ -23,8 +24,8 @@ Board::Board() {
     ESP_LOGI(TAG, "UUID=%s SKU=%s", uuid_.c_str(), BOARD_NAME);
 }
 
-Board::~Board() {}		
-
+Board::~Board() {
+}				 
 std::string Board::GenerateUuid() {
     // UUID v4 requires 16 bytes of random data
     uint8_t uuid[16];
@@ -65,13 +66,19 @@ Camera* Board::GetCamera() {
     return nullptr;
 }
 
+// Music* Board::GetMusic() {
+//     static Esp32Music music;
+//     return &music;
+// }
+
+// Radio* Board::GetRadio() {
+//     static Esp32Radio radio;
+//     return &radio;
+// }
+
 Led* Board::GetLed() {
     static NoLed led;
     return &led;
-}
-
-SdCard* Board::GetSdCard() {
-    return nullptr;
 }
 
 std::string Board::GetSystemInfoJson() {

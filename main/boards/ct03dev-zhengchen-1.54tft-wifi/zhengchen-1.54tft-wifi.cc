@@ -1,6 +1,6 @@
 #include "wifi_board.h"
 #include "codecs/no_audio_codec.h"
-#include "display/lcd_display.h"
+#include "zhengchen_lcd_display.h"
 #include "system_reset.h"
 #include "application.h"
 #include "button.h"
@@ -17,36 +17,43 @@
 #include <driver/rtc_io.h>
 #include <esp_sleep.h>
 
-#define TAG "XINGZHI_CUBE_1_54TFT_WIFI"
+#define TAG "ZHENGCHEN_1_54TFT_WIFI"
 
-class XINGZHI_CUBE_1_54TFT_WIFI : public WifiBoard {
+class ZHENGCHEN_1_54TFT_WIFI : public WifiBoard {
 private:
     Button boot_button_;
     Button volume_up_button_;
     Button volume_down_button_;
-    SpiLcdDisplay* display_;
+    ZHENGCHEN_LcdDisplay* display_;
     PowerSaveTimer* power_save_timer_;
     PowerManager* power_manager_;
     esp_lcd_panel_io_handle_t panel_io_ = nullptr;
     esp_lcd_panel_handle_t panel_ = nullptr;
 
     void InitializePowerManager() {
-        power_manager_ = new PowerManager(GPIO_NUM_38);
+        power_manager_ = new PowerManager(GPIO_NUM_9);
+        power_manager_->OnTemperatureChanged([this](float chip_temp) {
+            display_->UpdateHighTempWarning(chip_temp);
+        });
+
         power_manager_->OnChargingStatusChanged([this](bool is_charging) {
             if (is_charging) {
                 power_save_timer_->SetEnabled(false);
+                ESP_LOGI("PowerManager", "Charging started");
             } else {
                 power_save_timer_->SetEnabled(true);
+                ESP_LOGI("PowerManager", "Charging stopped");
             }
         });
+    
     }
 
     void InitializePowerSaveTimer() {
-        rtc_gpio_init(GPIO_NUM_21);
-        rtc_gpio_set_direction(GPIO_NUM_21, RTC_GPIO_MODE_OUTPUT_ONLY);
-        rtc_gpio_set_level(GPIO_NUM_21, 1);
+        rtc_gpio_init(GPIO_NUM_2);
+        rtc_gpio_set_direction(GPIO_NUM_2, RTC_GPIO_MODE_OUTPUT_ONLY);
+        rtc_gpio_set_level(GPIO_NUM_2, 1);
 
-        power_save_timer_ = new PowerSaveTimer(-1, SECONDS_TO_SLEEP_MODE, SECONDS_TO_SHUTDOWN);
+        power_save_timer_ = new PowerSaveTimer(-1, 60, 300);
         power_save_timer_->OnEnterSleepMode([this]() {
             GetDisplay()->SetPowerSaveMode(true);
             GetBacklight()->SetBrightness(1);
@@ -54,14 +61,6 @@ private:
         power_save_timer_->OnExitSleepMode([this]() {
             GetDisplay()->SetPowerSaveMode(false);
             GetBacklight()->RestoreBrightness();
-        });
-        power_save_timer_->OnShutdownRequest([this]() {
-            ESP_LOGI(TAG, "Shutting down");
-            rtc_gpio_set_level(GPIO_NUM_21, 0);
-            // 启用保持功能，确保睡眠期间电平不变
-            rtc_gpio_hold_en(GPIO_NUM_21);
-            esp_lcd_panel_disp_on_off(panel_, false); //关闭显示
-            esp_deep_sleep_start();
         });
         power_save_timer_->SetEnabled(true);
     }
@@ -78,6 +77,7 @@ private:
     }
 
     void InitializeButtons() {
+        
         boot_button_.OnClick([this]() {
             power_save_timer_->WakeUp();
             auto& app = Application::GetInstance();
@@ -85,6 +85,20 @@ private:
                 ResetWifiConfiguration();
             }
             app.ToggleChatState();
+        });
+
+        // 设置开机按钮的长按事件（直接进入配网模式）
+        boot_button_.OnLongPress([this]() {
+            // 唤醒电源保存定时器
+            power_save_timer_->WakeUp();
+            // 获取应用程序实例
+            auto& app = Application::GetInstance();
+            
+            // 进入配网模式
+            app.SetDeviceState(kDeviceStateWifiConfiguring);
+            
+            // 重置WiFi配置以确保进入配网模式
+            ResetWifiConfiguration();
         });
 
         volume_up_button_.OnClick([this]() {
@@ -95,7 +109,7 @@ private:
                 volume = 100;
             }
             codec->SetOutputVolume(volume);
-            GetDisplay()->ShowNotification(Lang::Strings::VOLUME + std::to_string(volume));
+            GetDisplay()->ShowNotification(Lang::Strings::VOLUME + std::to_string(volume/10));
         });
 
         volume_up_button_.OnLongPress([this]() {
@@ -112,7 +126,7 @@ private:
                 volume = 0;
             }
             codec->SetOutputVolume(volume);
-            GetDisplay()->ShowNotification(Lang::Strings::VOLUME + std::to_string(volume));
+            GetDisplay()->ShowNotification(Lang::Strings::VOLUME + std::to_string(volume/10));
         });
 
         volume_down_button_.OnLongPress([this]() {
@@ -146,12 +160,16 @@ private:
         ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y));
         ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel_, true));
 
-        display_ = new SpiLcdDisplay(panel_io_, panel_, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, 
+        display_ = new ZHENGCHEN_LcdDisplay(panel_io_, panel_, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, 
             DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
+        display_->SetupHighTempWarningPopup();
+    }
+
+    void InitializeTools() {
     }
 
 public:
-    XINGZHI_CUBE_1_54TFT_WIFI() :
+    ZHENGCHEN_1_54TFT_WIFI() :
         boot_button_(BOOT_BUTTON_GPIO),
         volume_up_button_(VOLUME_UP_BUTTON_GPIO),
         volume_down_button_(VOLUME_DOWN_BUTTON_GPIO) {
@@ -159,13 +177,17 @@ public:
         InitializePowerSaveTimer();
         InitializeSpi();
         InitializeButtons();
-        InitializeSt7789Display();
+        InitializeSt7789Display();  
+        InitializeTools();
         GetBacklight()->RestoreBrightness();
     }
 
+    // 获取音频编解码器
     virtual AudioCodec* GetAudioCodec() override {
+        // 静态实例化NoAudioCodecSimplex类
         static NoAudioCodecSimplex audio_codec(AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
             AUDIO_I2S_SPK_GPIO_BCLK, AUDIO_I2S_SPK_GPIO_LRCK, AUDIO_I2S_SPK_GPIO_DOUT, AUDIO_I2S_MIC_GPIO_SCK, AUDIO_I2S_MIC_GPIO_WS, AUDIO_I2S_MIC_GPIO_DIN);
+        // 返回音频编解码器
         return &audio_codec;
     }
 
@@ -186,7 +208,12 @@ public:
             power_save_timer_->SetEnabled(discharging);
             last_discharging = discharging;
         }
-        level = power_manager_->GetBatteryLevel();
+        level = std::max<uint32_t>(power_manager_->GetBatteryLevel(), 20);
+        return true;
+    }
+
+    virtual bool GetTemperature(float& esp32temp)  override {
+        esp32temp = power_manager_->GetTemperature();
         return true;
     }
 
@@ -198,4 +225,4 @@ public:
     }
 };
 
-DECLARE_BOARD(XINGZHI_CUBE_1_54TFT_WIFI);
+DECLARE_BOARD(ZHENGCHEN_1_54TFT_WIFI);

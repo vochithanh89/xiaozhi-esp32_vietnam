@@ -15,9 +15,10 @@
 #include "ota.h"
 #include "audio_service.h"
 #include "device_state_event.h"
-#include "esp32_sd_music.h"
+
 #include "esp32_music.h"
 #include "esp32_radio.h"
+
 
 #define MAIN_EVENT_SCHEDULE (1 << 0)
 #define MAIN_EVENT_SEND_AUDIO (1 << 1)
@@ -67,9 +68,8 @@ public:
     void AddAudioData(AudioStreamPacket&& packet);
     void PlaySound(const std::string_view& sound);
     AudioService& GetAudioService() { return audio_service_; }
-	Esp32Music* GetMusic() { return music_; }
+    Esp32Music* GetMusic() { return music_; }
 	Esp32Radio* GetRadio() { return radio_; }
-	Esp32SdMusic* GetSdMusic() { return sd_music_; }
 
 private:
     Application();
@@ -87,7 +87,6 @@ private:
     AudioService audio_service_;
     Esp32Music* music_ = nullptr;
     Esp32Radio* radio_ = nullptr;
-    Esp32SdMusic* sd_music_ = nullptr;
 
     bool has_server_time_ = false;
     bool aborted_ = false;

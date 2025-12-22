@@ -12,46 +12,12 @@
 #include <esp_err.h>
 #include <esp_lvgl_port.h>
 #include <esp_psram.h>
-#include <string>
-#include <cstdint>
-#include <ctime>
 #include <cstring>
 #include <cmath>
 #include <math.h>
-#include <cctype>
 #include <qrcode.h>
 
 #include "board.h"
-#include "esp32_sd_music.h"
-#include "application.h"
-#include "lvgl.h"
-
-// ============================================================
-//  SD MUSIC PLAYER ACCESS (LVGL 9.x)
-// ============================================================
-
-static Esp32SdMusic* get_sd_player() {
-    return Application::GetInstance().GetSdMusic();
-}
-
-// ---------- UTILITY: Convert ms → mm:ss (hoặc hh:mm:ss) ----------
-static std::string ms_to_time_string(int64_t ms) {
-    if (ms < 0) ms = 0;
-	
-    int total_sec = ms / 1000;
-    int sec  = total_sec % 60;
-    int min  = (total_sec / 60) % 60;
-    int hour = total_sec / 3600;
-
-    char buf[32];
-    if (hour > 0)
-        snprintf(buf, sizeof(buf), "%02d:%02d:%02d", hour, min, sec);
-    else
-        snprintf(buf, sizeof(buf), "%02d:%02d", min, sec);
-
-    return std::string(buf);
-}
-
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -59,7 +25,6 @@ static std::string ms_to_time_string(int64_t ms) {
 #define TAG "LcdDisplay"
 
 //Declare theme color
-#define BAR_MAX_HEIGHT (240 / 2)
 #define BAR_COL_NUM  40
 #define LCD_FFT_SIZE 512
 static int current_heights[BAR_COL_NUM] = {0};
@@ -175,7 +140,6 @@ LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_
 
     final_pcm_data_fft = nullptr;
     rotation_degree_ = 0;
-    bar_max_hight_ = height_ / 2; // BAR_MAX_HEIGHT
 
     // Initialize LCD themes
     InitializeLcdThemes();
@@ -1127,64 +1091,16 @@ void LcdDisplay::SetEmotion(const char* emotion) {
 }
 
 void LcdDisplay::SetMusicInfo(const char* song_name) {
-    // Lưu lại vào biến để DetectSourceFromInfo() dùng
-    if (song_name != nullptr)
-        music_info_ = song_name;
-    else
-        music_info_.clear();
-
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE
     // In WeChat mode, do not display the song name, keep the original chat functionality
     return;
 #else
     // Non-WeChat mode: display the song name below the emoji
     DisplayLockGuard lock(this);
-
-    // Nếu đang có UI FFT + nhạc trên canvas → update trực tiếp vào label
-    if (canvas_ != nullptr && music_root_ != nullptr && lv_obj_is_valid(canvas_)) {
-        std::string text = song_name ? song_name : "";
-        std::string line1, line2;
-
-        size_t pos = text.find('\n');
-        if (pos != std::string::npos) {
-            line1 = text.substr(0, pos);
-            line2 = text.substr(pos + 1);
-        } else {
-            line1 = text;
-            line2.clear();
-        }
-
-        // ==========================
-        // 🎵 DÒNG 1 — TITLE (scroll)
-        // ==========================
-        if (music_title_label_ && lv_obj_is_valid(music_title_label_)) {
-            lv_label_set_text(music_title_label_, line1.c_str());
-            lv_label_set_long_mode(music_title_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
-            lv_obj_set_width(music_title_label_, canvas_width_ - 40);
-        }
-
-        // ==========================
-        // 🎶 DÒNG 2 — SUBINFO (scroll)
-        // ==========================
-        if (music_subinfo_label_ && lv_obj_is_valid(music_subinfo_label_)) {
-            lv_label_set_text(music_subinfo_label_, line2.c_str());
-            lv_label_set_long_mode(music_subinfo_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
-            lv_obj_set_width(music_subinfo_label_, canvas_width_ - 40);
-        }
-
-        // Nếu rỗng → clear chat bubble
-        if ((!song_name || strlen(song_name) == 0) && chat_message_label_) {
-            lv_label_set_text(chat_message_label_, "");
-        }
-
-        return;  // ⬅️ RẤT QUAN TRỌNG — không để UI chat override
+    if (chat_message_label_ == nullptr) {
+        return;
     }
-
-    // ==========================
-    // Không có FFT → hiển thị kiểu cũ
-    // ==========================
-    if (chat_message_label_ == nullptr) return;
-
+    
     if (song_name != nullptr && strlen(song_name) > 0) {
         std::string music_text = "";
         music_text += song_name;
@@ -1202,34 +1118,6 @@ void LcdDisplay::SetMusicInfo(const char* song_name) {
         lv_label_set_text(chat_message_label_, "");
     }
 #endif
-}
-
-LcdDisplay::DisplaySourceType LcdDisplay::DetectSourceFromInfo() const {
-    std::string s = music_info_;
-    for (auto &c : s) c = tolower(c);
-
-    // 1) Nhận diện Radio trước
-    if (s.find("radio") != std::string::npos ||
-        s.find("fm")    != std::string::npos)
-        return DisplaySourceType::RADIO;
-
-    // 2) Nhận diện Online trước
-	if (s.rfind("ONLINE:", 0) == 0)
-    return DisplaySourceType::ONLINE;
-
-    if (s.find("online") != std::string::npos ||
-        s.find("http")   != std::string::npos ||
-        s.find("rtmp")   != std::string::npos ||
-        s.find("m3u")    != std::string::npos)
-        return DisplaySourceType::ONLINE;
-
-    // 3) SD-card (chỉ khi REAL PLAYING)
-    Esp32SdMusic* sd = get_sd_player();
-    if (sd && sd->getState() == Esp32SdMusic::PlayerState::Playing)
-        return DisplaySourceType::SD_CARD;
-
-    // 4) Default
-    return DisplaySourceType::NONE;
 }
 
 void LcdDisplay::SetTheme(Theme* theme) {
@@ -1373,14 +1261,13 @@ void LcdDisplay::StartFFT() {
 
     // Create a periodic update task
     fft_task_should_stop = false;  // Reset the stop flag
-    xTaskCreatePinnedToCore(
+    xTaskCreate(
         periodicUpdateTaskWrapper,
         "display_fft",      // Task name
-        1024 * 3,           // Stack size
+        4096*2,             // Stack size
         this,               // Parameter
         1,                  // Priority
-        &fft_task_handle,   // Save to member variable
-        0                   // Run on core 0
+        &fft_task_handle    // Save to member variable
     );
 }
 
@@ -1429,27 +1316,6 @@ void LcdDisplay::StopFFT() {
         canvas_ = nullptr;
         ESP_LOGI(TAG, "FFT canvas deleted");
     }
-	
-	// =============================================
-	// XÓA HOÀN TOÀN UI NHẠC (tránh bị đọng label)
-	// =============================================
-	if (music_root_ && lv_obj_is_valid(music_root_)) {
-		lv_obj_del(music_root_);     // delete toàn bộ nhóm UI nhạc
-		ESP_LOGI(TAG, "Music UI deleted");
-	}
-	
-	// =========================
-	// RESET MUSIC UI POINTERS
-	// =========================
-	music_root_          = nullptr;
-	music_title_label_   = nullptr;
-	music_date_label_    = nullptr;
-	music_bar_           = nullptr;
-	music_time_left_     = nullptr;
-	music_time_total_    = nullptr;
-	music_time_remain_   = nullptr;    
-	music_subinfo_label_ = nullptr;
-	music_next_line_     = nullptr;
     
     // Free the canvas buffer memory
     if (canvas_buffer_ != nullptr) {
@@ -1461,21 +1327,6 @@ void LcdDisplay::StopFFT() {
     // Reset canvas dimension variables
     canvas_width_ = 0;
     canvas_height_ = 0;
-	
-	// Ẩn các label nhạc nếu vẫn còn tồn tại (trường hợp canvas bị xóa nhưng label vẫn hiện)
-    if (music_title_label_)   lv_obj_add_flag(music_title_label_, LV_OBJ_FLAG_HIDDEN);
-    if (music_date_label_)    lv_obj_add_flag(music_date_label_, LV_OBJ_FLAG_HIDDEN);
-    if (music_bar_)           lv_obj_add_flag(music_bar_, LV_OBJ_FLAG_HIDDEN);
-    if (music_time_left_)     lv_obj_add_flag(music_time_left_, LV_OBJ_FLAG_HIDDEN);
-    if (music_time_total_)    lv_obj_add_flag(music_time_total_, LV_OBJ_FLAG_HIDDEN);
-    if (music_time_remain_)   lv_obj_add_flag(music_time_remain_, LV_OBJ_FLAG_HIDDEN);
-    if (music_subinfo_label_) lv_obj_add_flag(music_subinfo_label_, LV_OBJ_FLAG_HIDDEN);
-    if (music_next_line_)     lv_obj_add_flag(music_next_line_, LV_OBJ_FLAG_HIDDEN);
-
-	
-	// Hiện lại emoji khi thoát giao diện nhạc
-    if (emoji_label_) lv_obj_clear_flag(emoji_label_, LV_OBJ_FLAG_HIDDEN);
-    if (emoji_image_) lv_obj_clear_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
     
     ESP_LOGI(TAG, "FFT display stopped, original UI restored");
 }
@@ -1489,285 +1340,20 @@ void LcdDisplay::periodicUpdateTask() {
     ESP_LOGI(TAG, "Periodic update task started");
     
     if (canvas_ == nullptr) {
-        int status_h = lv_obj_get_height(status_bar_);
-        create_canvas(status_h);
-
-        if (canvas_) {
-            // MỌI GỌI LVGL PHẢI DƯỚI LOCK
-            {
-                DisplayLockGuard lock(this);
-
-				// Ẩn emoji khi chuyển sang giao diện phát nhạc (ẩn cả label và icon)
-				if (emoji_label_) lv_obj_add_flag(emoji_label_, LV_OBJ_FLAG_HIDDEN);
-				if (emoji_image_) lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
-
-                // Clear nền
-                lv_canvas_fill_bg(canvas_, lv_color_black(), LV_OPA_COVER);
-
-                // ================= UI BẮT ĐẦU (LVGL 9 - MODERN STYLE) =================
-				// 1. Lấy trạng thái Player và Source
-				Esp32SdMusic* sd_player = get_sd_player();
-				bool sd_playing = sd_player &&
-								  sd_player->getState() == Esp32SdMusic::PlayerState::Playing;
-
-				DisplaySourceType source = DetectSourceFromInfo();
-
-				// 2. Định nghĩa Palette màu sắc sống động (Vivid Colors)
-				// Dùng màu Neon để nổi bật trên nền tối
-				lv_color_t color_accent;
-				const char* icon_symbol;
-
-				switch (source) {
-					case DisplaySourceType::SD_CARD:
-						color_accent = lv_color_hex(0x00FFC2); // Emerald Neon (Xanh ngọc sáng)
-						icon_symbol  = LV_SYMBOL_SD_CARD;
-						break;
-					case DisplaySourceType::RADIO:
-						color_accent = lv_color_hex(0xFF9E40); // Sunset Orange (Cam rực rỡ)
-						icon_symbol  = LV_SYMBOL_VOLUME_MAX; // Hoặc icon sóng
-						break;
-					case DisplaySourceType::ONLINE:
-						color_accent = lv_color_hex(0x00D9FF); // Cyber Cyan (Xanh dương điện tử)
-						icon_symbol  = LV_SYMBOL_AUDIO; // Hoặc icon Wifi/Cloud
-						break;
-					case DisplaySourceType::NONE:
-					default:
-						color_accent = lv_color_hex(0xFFFFFF);
-						icon_symbol  = LV_SYMBOL_AUDIO;
-						break;
-				}
-
-				// Chỉ hiển thị UI nếu có nguồn phát hợp lệ
-				if (!(source == DisplaySourceType::NONE && !sd_playing))
-				{
-					auto theme      = static_cast<LvglTheme*>(current_theme_);
-					auto text_font  = theme->text_font()->font();
-					auto icon_font  = theme->large_icon_font()->font();
-
-					// Kích thước cơ sở để tính toán tỉ lệ (Responsive)
-					const int w = canvas_width_;
-					const int h = canvas_height_;
-					const int pad_side = (int)(w * 0.04f); // Lề 4% chiều rộng
-					const int pad_top  = (int)(h * 0.05f); // Lề 5% chiều cao
-
-					// --- ROOT CONTAINER ---
-					music_root_ = lv_obj_create(canvas_);
-					lv_obj_remove_style_all(music_root_);
-					lv_obj_set_size(music_root_, w, h);
-					lv_obj_set_style_bg_opa(music_root_, LV_OPA_TRANSP, 0);
-
-					// =========================================================
-					// (1) BACKGROUND OVERLAY: GRADIENT MỀM MẠI
-					// Thay vì 2 khối cứng, dùng Gradient dọc để tan vào nền FFT
-					// =========================================================
-					lv_obj_t* overlay = lv_obj_create(music_root_);
-					lv_obj_remove_style_all(overlay);
-					lv_obj_set_size(overlay, w, (int)(h * 0.35f)); // Phủ 35% màn hình từ trên xuống
-					
-					// Tạo hiệu ứng mờ dần từ Đen (70%) -> Trong suốt
-					lv_obj_set_style_bg_color(overlay, lv_color_black(), 0);
-					lv_obj_set_style_bg_grad_color(overlay, lv_color_black(), 0);
-					lv_obj_set_style_bg_grad_dir(overlay, LV_GRAD_DIR_VER, 0);
-					lv_obj_set_style_bg_opa(overlay, LV_OPA_COVER, 0);       // Nền chính
-					lv_obj_set_style_bg_main_stop(overlay, 0, 0);            // Bắt đầu gradient ngay đỉnh
-					lv_obj_set_style_bg_grad_stop(overlay, 255, 0);          // Kết thúc ở đáy object
-					
-					// Hack trong suốt bằng Map opacity (Nếu LVGL config hỗ trợ) 
-					// Hoặc đơn giản dùng màu đen với OPA giảm dần. 
-					// Cách an toàn nhất cho ESP32 ít tốn resource:
-					lv_obj_set_style_bg_opa(overlay, 200, 0); // Độ đậm tổng thể
-
-					// =========================================================
-					// (2) ICON CHÍNH: CÂN ĐỐI VÀ NỔI BẬT
-					// =========================================================
-					lv_obj_t* icon = lv_label_create(music_root_);
-					lv_obj_set_style_text_font(icon, icon_font, 0);
-					lv_obj_set_style_text_color(icon, color_accent, 0);
-					lv_label_set_text(icon, icon_symbol);
-					
-					// Đặt icon ở góc trên trái, nhưng căn chỉnh visual cho cân
-					lv_obj_align(icon, LV_ALIGN_TOP_LEFT, pad_side, pad_top);
-
-					// =========================================================
-					// (3) XỬ LÝ NỘI DUNG (Content)
-					// =========================================================
-					
-					// Biến tạm để lưu chuỗi hiển thị
-					std::string title_str, sub_str;
-					bool show_progress = false;
-
-					// Lấy dữ liệu theo Source
-					if (source == DisplaySourceType::SD_CARD && sd_playing) {
-						title_str = sd_player->getCurrentTrack();
-						if (title_str.empty()) title_str = "Unknown Track";
-						
-						int bitrate = sd_player->getBitrate();
-						char buff[32];
-						snprintf(buff, sizeof(buff), "%d kbps / MP3", bitrate/1000);
-						sub_str = std::string(buff);
-						show_progress = true;
-					} else {
-						// ================================
-						// TÁCH 2 DÒNG TỪ music_info_
-						// ================================
-						std::string line1, line2;
-						{
-							size_t pos = music_info_.find('\n');
-							if (pos != std::string::npos) {
-								line1 = music_info_.substr(0, pos);
-								line2 = music_info_.substr(pos + 1);
-							} else {
-								// Nếu không có xuống dòng → lấy nguyên chuỗi
-								line1 = music_info_;
-								line2 = "";
-							}
-						}
-
-						// --- Title ---
-						title_str = line1.empty()
-									? (source == DisplaySourceType::ONLINE ? "Music Online" : "FM Radio")
-									: line1;
-
-						// --- Sub info ---
-						if (source == DisplaySourceType::ONLINE) {
-							// GIỮ nguyên line2 nếu đã được SetMusicInfo gửi xuống
-							sub_str = !line2.empty() ? line2 : "Đang phát...";
-						}
-						else if (source == DisplaySourceType::RADIO) {
-							// GIỮ nguyên line2 nếu đã được SetRadioInfo gửi xuống
-							sub_str = !line2.empty() ? line2 : "Live Broadcast";
-						}
-
-						show_progress = false;
-					}
-
-					// --- TITLE (TIÊU ĐỀ) ---
-					lv_obj_t* title = lv_label_create(music_root_);
-					lv_obj_set_style_text_font(title, text_font, 0);
-					lv_obj_set_style_text_color(title, lv_color_white(), 0);
-					lv_label_set_long_mode(title, LV_LABEL_LONG_SCROLL_CIRCULAR); // Cuộn tròn nếu dài
-					
-					// Tính toán chiều rộng để không đè lên icon và lề phải
-					// W = Màn hình - (Lề trái + Icon + Khoảng cách icon-text) - Lề phải
-					int icon_width = 30; // Ước lượng, hoặc dùng lv_obj_get_width sau khi vẽ
-					int text_width = w - (pad_side + icon_width + pad_side) - pad_side; 
-					
-					lv_obj_set_width(title, text_width);
-					lv_label_set_text(title, title_str.c_str());
-					
-					// Căn title thẳng hàng với đỉnh của icon
-					lv_obj_align_to(title, icon, LV_ALIGN_OUT_RIGHT_TOP, pad_side, 0);
-					music_title_label_ = title;
-
-					// --- SUB INFO (THÔNG TIN PHỤ) ---
-					lv_obj_t* sub = lv_label_create(music_root_);
-					lv_obj_set_style_text_font(sub, text_font, 0);
-					// Màu xám sáng để dịu mắt hơn trắng tinh, tạo chiều sâu
-					lv_obj_set_style_text_color(sub, lv_color_hex(0xAAAAAA), 0); 
-					lv_label_set_text(sub, sub_str.c_str());
-					lv_label_set_long_mode(sub, LV_LABEL_LONG_SCROLL_CIRCULAR);
-					lv_obj_set_width(sub, canvas_width_ - 40);
-					
-					// Nằm ngay dưới Title
-					lv_obj_align_to(sub, title, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 4); // Cách title 4px
-					music_subinfo_label_ = sub;
-
-					// =========================================================
-					// (4) PROGRESS BAR & NEXT TRACK (CHỈ CHO SD CARD)
-					// =========================================================
-					if (show_progress) {
-						int64_t pos_ms = sd_player->getCurrentPositionMs();
-						int64_t dur_ms = sd_player->getDurationMs();
-						
-						// --- THANH TIẾN ĐỘ TINH TẾ (SLIM BAR) ---
-						lv_obj_t* bar = lv_bar_create(music_root_);
-						lv_obj_set_size(bar, w - (pad_side * 2), 4); // Cao 4px cho thanh mảnh
-						lv_obj_align_to(bar, sub, LV_ALIGN_OUT_BOTTOM_LEFT, -icon_width - pad_side, 12); // Cách sub 12px
-
-						// Style Nền Bar (Tối)
-						lv_obj_set_style_bg_color(bar, lv_color_hex(0x303030), LV_PART_MAIN);
-						lv_obj_set_style_radius(bar, 2, LV_PART_MAIN);
-
-						// Style Indicator (Màu theo Accent)
-						lv_obj_set_style_bg_color(bar, color_accent, LV_PART_INDICATOR);
-						lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_INDICATOR);
-						lv_obj_set_style_radius(bar, 2, LV_PART_INDICATOR);
-						
-						// Hiệu ứng bóng đổ nhẹ cho Indicator (Glow effect giả lập)
-						// lv_obj_set_style_shadow_width(bar, 5, LV_PART_INDICATOR);
-						// lv_obj_set_style_shadow_color(bar, color_accent, LV_PART_INDICATOR);
-
-						lv_bar_set_range(bar, 0, dur_ms);
-						lv_bar_set_value(bar, pos_ms, LV_ANIM_OFF);
-						music_bar_ = bar;
-
-						// --- THỜI GIAN (Time Labels) ---
-						// Current Time (Bên trái Bar)
-						lv_obj_t* t_curr = lv_label_create(music_root_);
-						lv_obj_set_style_text_font(t_curr, text_font, 0);
-						lv_obj_set_style_text_color(t_curr, color_accent, 0); // Màu giống icon cho đồng bộ
-						lv_label_set_text(t_curr, sd_player->getCurrentTimeString().c_str());
-						lv_obj_align_to(t_curr, bar, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 6);
-						music_time_left_ = t_curr;
-
-						// Duration / Remaining (Bên phải Bar)
-						lv_obj_t* t_dur = lv_label_create(music_root_);
-						lv_obj_set_style_text_font(t_dur, text_font, 0);
-						lv_obj_set_style_text_color(t_dur, lv_color_hex(0xAAAAAA), 0);
-						lv_label_set_text(t_dur, sd_player->getDurationString().c_str()); // Hoặc tính remain
-						lv_obj_align_to(t_dur, bar, LV_ALIGN_OUT_BOTTOM_RIGHT, 0, 6);
-						music_time_remain_ = t_dur; // Tái sử dụng pointer này
-
-						// --- NEXT TRACK INFO (Dòng nhỏ cuối cùng) ---
-						// Lấy tên bài tiếp theo
-						auto tracks = sd_player->listTracks();
-						std::string cur_path = sd_player->getCurrentTrackPath();
-						int idx = -1; 
-						for(size_t i=0; i<tracks.size(); ++i) if(tracks[i].path == cur_path) idx = i;
-						
-						std::string next_txt = "End of playlist";
-						if(idx >= 0 && idx < (int)tracks.size() - 1) next_txt = tracks[idx+1].name;
-						else if(!tracks.empty()) next_txt = tracks[0].name; // Loop về bài đầu
-
-						lv_obj_t* next_lbl = lv_label_create(music_root_);
-						lv_obj_set_style_text_font(next_lbl, text_font, 0);
-						lv_obj_set_style_text_color(next_lbl, lv_color_hex(0x707070), 0); // Màu tối hơn để ít gây chú ý
-						
-						char next_buff[128];
-						snprintf(next_buff, sizeof(next_buff), "Next: %s", next_txt.c_str());
-						lv_label_set_text(next_lbl, next_buff);
-						lv_label_set_long_mode(next_lbl, LV_LABEL_LONG_SCROLL_CIRCULAR);
-						lv_obj_set_width(next_lbl, w - pad_side * 2);
-						
-						// Đặt ở vị trí cân đối phía dưới
-						lv_obj_align_to(next_lbl, t_curr, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 4);
-						music_next_line_ = next_lbl;
-					} 
-					else {
-						// Reset các pointer không dùng cho Online/Radio để tránh lỗi update
-						music_bar_ = nullptr;
-						music_time_left_ = nullptr;
-						music_time_remain_ = nullptr;
-						music_next_line_ = nullptr;
-						music_time_total_ = nullptr;
-					}
-				}
-				// ================= UI KẾT THÚC =================
-
-                lv_obj_invalidate(canvas_);
-            }
-        }
-
+        create_canvas(lv_obj_get_height(status_bar_));
+        // Clear the canvas 
+        lv_canvas_fill_bg(canvas_, lv_color_black(), LV_OPA_COVER);
+        lv_obj_invalidate(canvas_);
         vTaskDelay(pdMS_TO_TICKS(100));
     } else {
         ESP_LOGI(TAG, "Canvas already created");
     }
   
-    const TickType_t displayInterval      = pdMS_TO_TICKS(25);  // Display refresh interval (25ms)
-    const TickType_t audioProcessInterval = pdMS_TO_TICKS(10);  // Audio processing interval (10ms)
+    const TickType_t displayInterval = pdMS_TO_TICKS(40);  // Display refresh interval (40ms)
+    const TickType_t audioProcessInterval = pdMS_TO_TICKS(15); // Audio processing interval (15ms)
     
     TickType_t lastDisplayTime = xTaskGetTickCount();
-    TickType_t lastAudioTime   = xTaskGetTickCount();
+    TickType_t lastAudioTime = xTaskGetTickCount();
     
     while (!fft_task_should_stop) {
         
@@ -1790,115 +1376,13 @@ void LcdDisplay::periodicUpdateTask() {
                 drawSpectrumIfReady();
                 lv_area_t refresh_area;
                 refresh_area.x1 = 0;
-                refresh_area.y1 = height_ - bar_max_hight_;
+                refresh_area.y1 = height_ - 150;
                 refresh_area.x2 = canvas_width_ - 1;
                 refresh_area.y2 = height_ - 1; // Only refresh the spectrum area
                 lv_obj_invalidate_area(canvas_, &refresh_area);
                 fft_data_ready = false;
                 lastDisplayTime = currentTime;
             }
-        }
-        
-        // ================================
-        // 🟦 UPDATE MUSIC UI (mỗi 1 giây)
-        // ================================
-        static TickType_t lastClockUpdate = 0;
-        if (currentTime - lastClockUpdate >= pdMS_TO_TICKS(1000)) {
-
-            Esp32SdMusic* sd = get_sd_player();
-
-            if (sd &&
-                music_root_        && lv_obj_is_valid(music_root_) &&
-                music_bar_         && lv_obj_is_valid(music_bar_))
-            {
-                DisplayLockGuard lock(this);
-
-                // Cập nhật progress bar
-                lv_bar_set_range(music_bar_, 0, sd->getDurationMs());
-                lv_bar_set_value(music_bar_, sd->getCurrentPositionMs(), LV_ANIM_OFF);
-
-                // Thời gian hiện tại
-                if (music_time_left_ && lv_obj_is_valid(music_time_left_)) {
-                    std::string cur = sd->getCurrentTimeString();
-                    lv_label_set_text(music_time_left_, cur.c_str());
-                }
-
-                // Thời gian còn lại
-                if (music_time_remain_ && lv_obj_is_valid(music_time_remain_)) {
-					int64_t pos = sd->getCurrentPositionMs();
-					int64_t dur = sd->getDurationMs();
-					int64_t rem = dur - pos;
-					if (rem < 0) rem = 0;
-
-					std::string remain_str = ms_to_time_string(rem);
-					lv_label_set_text(music_time_remain_, remain_str.c_str());
-				}
-
-                // Tên bài hát (nếu chuyển bài)
-                if (music_title_label_ && lv_obj_is_valid(music_title_label_)) {
-                    std::string t = sd->getCurrentTrack();
-                    if (!t.empty()) {
-                        lv_label_set_text(music_title_label_, t.c_str());
-                    }
-                }
-
-                // Nếu sau này bạn có dùng music_date_label_ thì block này vẫn an toàn
-                if (music_date_label_ && lv_obj_is_valid(music_date_label_)) {
-                    time_t now = time(NULL);
-                    struct tm tm_info;
-                    localtime_r(&now, &tm_info);
-
-                    char buf[32];
-                    strftime(buf, sizeof(buf), "%d-%m-%Y", &tm_info);
-                    lv_label_set_text(music_date_label_, buf);
-                }
-            
-				// --- cập nhật bitrate + tổng thời lượng ---
-				if (music_subinfo_label_ && lv_obj_is_valid(music_subinfo_label_)) {
-
-					int br = sd->getBitrate();   // lấy bitrate gốc (thường = 128000)
-					if (br > 1000) br /= 1000;   // chuyển bps → kbps (128000 → 128)
-
-					char sub_text[64];
-					snprintf(sub_text, sizeof(sub_text),
-							 "%d kbps  •  %s",
-							 br,
-							 sd->getDurationString().c_str());
-
-					lv_label_set_text(music_subinfo_label_, sub_text);
-					lv_label_set_long_mode(music_subinfo_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
-					lv_obj_set_width(music_subinfo_label_, canvas_width_ - 40);
-
-				}
-				
-				// --- cập nhật dòng "Tiếp theo: ..." ---
-				if (music_next_line_ && lv_obj_is_valid(music_next_line_)) {
-
-					auto list = sd->listTracks();
-
-					// tìm index hiện tại qua path
-					std::string cur_path = sd->getCurrentTrackPath();
-					int cur = 0;
-					for (int i = 0; i < (int)list.size(); i++) {
-						if (list[i].path == cur_path) {
-							cur = i;
-							break;
-						}
-					}
-
-					int total = list.size();
-					int next = (cur + 1) % total;
-
-					std::string next_title =
-						(next < total) ? list[next].name : "Không có bài kế tiếp";
-
-					std::string tip = "Tiếp theo: " + next_title;
-					lv_label_set_text(music_next_line_, tip.c_str());
-				}
-
-			}		
-			
-            lastClockUpdate = currentTime;
         }
 
         vTaskDelay(pdMS_TO_TICKS(10)); // Short delay
@@ -1954,7 +1438,7 @@ void LcdDisplay::drawSpectrumIfReady() {
 void LcdDisplay::draw_spectrum(float *power_spectrum,int fft_size){
     const int bartotal=BAR_COL_NUM;
     int bar_height;
-    const int bar_max_height = bar_max_hight_;
+    const int bar_max_height=canvas_height_ - 50;
     const int bar_width=canvas_width_/bartotal;
     int x_pos=0;
     int y_pos = (canvas_height_) - 1;
@@ -2175,47 +1659,28 @@ void LcdDisplay::compute(float* real, float* imag, int n, bool forward) {
     }
 }
 
-uint16_t LcdDisplay::get_bar_color(int x_pos) {
-    // Tăng offset theo thời gian để màu chạy
-    static float hue_offset = 0.0f;
-    hue_offset += 0.1f;       // tốc độ chạy màu (có thể chỉnh 0.3 → 2.0)
+uint16_t LcdDisplay::get_bar_color(int x_pos){
 
-    if (hue_offset >= 360.0f)
-        hue_offset -= 360.0f;
-
-    // Hue tổng = hue theo cột + offset
-    float base_hue = (float)x_pos * (240.0f / 40.0f);   // blue → red
-    float h = fmodf(base_hue + hue_offset, 360.0f);     // hue chạy
-
-    float s = 1.0f;
-    float v = 1.0f;
-    float c = v * s;
-
-    float hh = h / 60.0f;
-    float x = c * (1.0f - fabsf(fmodf(hh, 2.0f) - 1.0f));
-
-    float r1 = 0, g1 = 0, b1 = 0;
-
-    int region = (int)hh;
-    switch (region) {
-        case 0: r1 = c; g1 = x; b1 = 0; break;
-        case 1: r1 = x; g1 = c; b1 = 0; break;
-        case 2: r1 = 0; g1 = c; b1 = x; break;
-        case 3: r1 = 0; g1 = x; b1 = c; break;
-        case 4: r1 = x; g1 = 0; b1 = c; break;
-        default:r1 = c; g1 = 0; b1 = x; break;
+    static uint16_t color_table[BAR_COL_NUM];
+    static bool initialized = false;
+    
+    if (!initialized) {
+        // Generate gradient from yellow-green -> yellow -> yellow-red
+        for (int i = 0; i < BAR_COL_NUM; i++) {
+            if (i < BAR_COL_NUM/2) {
+                // Yellow-green to yellow: increase red component
+                uint8_t r = static_cast<uint8_t>((i / 19.0f) * 31);
+                color_table[i] = (r << 11) | (0x3F << 5);
+            } else {
+                // Yellow to yellow-red: decrease green component
+                uint8_t g = static_cast<uint8_t>((1.0f - (i - 20) / 19.0f * 0.5f) * 63);
+                color_table[i] = (0x1F << 11) | (g << 5);
+            }
+        }
+        initialized = true;
     }
-
-    float m = v - c;
-    float rf = r1 + m;
-    float gf = g1 + m;
-    float bf = b1 + m;
-
-    uint8_t r = (uint8_t)(rf * 31);
-    uint8_t g = (uint8_t)(gf * 63);
-    uint8_t b = (uint8_t)(bf * 31);
-
-    return (r << 11) | (g << 5) | b;
+    
+    return color_table[x_pos];
 }
 
 void LcdDisplay::DisplayQRCode(const uint8_t* qrcode, const char* text) {
