@@ -46,8 +46,8 @@ public:
     virtual bool GetTemperature(float& esp32temp);
     virtual Display* GetDisplay();
     virtual Camera* GetCamera();
-    virtual Music* GetMusic();
-    virtual Radio* GetRadio();
+    // virtual Music* GetMusic();
+    // virtual Radio* GetRadio();
     virtual NetworkInterface* GetNetwork() = 0;
     virtual void StartNetwork() = 0;
     virtual const char* GetNetworkStateIcon() = 0;
