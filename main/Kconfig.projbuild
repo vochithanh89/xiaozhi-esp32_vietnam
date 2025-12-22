@@ -117,6 +117,9 @@ choice BOARD_TYPE
     default BOARD_TYPE_BREAD_COMPACT_WIFI
     help
         Board type. 开发板类型
+    config BOARD_TYPE_CT03DEV_ZHENGCHEN_1_54TFT_WIFI
+        bool "CT03Dev - Zheng Chen - 1.54 inch - Wifi"
+        depends on IDF_TARGET_ESP32S3
     config BOARD_TYPE_XIAOZHI_AI_IOT_VIETNAM_ES3N28P_LCD_2_8
         bool "Xiaozhi AI IoT Vietnam ES3N28P LCD 2.8 inch"
         depends on IDF_TARGET_ESP32S3

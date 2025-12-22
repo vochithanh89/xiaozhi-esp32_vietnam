@@ -1,0 +1,16 @@
+{
+    "target": "esp32s3",
+    "builds": [
+        {
+            "name": "CT03Dev Assistant",
+            "sdkconfig_append": [
+                "CONFIG_FLASH_CUSTOM_ASSETS=y",
+                "CONFIG_OTA_URL=\"https://api.tenclass.net/xiaozhi/ota/\"",
+                "CONFIG_FLASH_CUSTOM_ASSETS=y",
+                "CONFIG_CUSTOM_ASSETS_FILE=\"assets.bin\"",
+                "CONFIG_LANGUAGE_VI_VN=y",
+                "CONFIG_SR_WN_WN9_SOPHIA_TTS=y"
+            ]
+        }
+    ]
+}
