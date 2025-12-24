@@ -6,7 +6,7 @@
             "sdkconfig_append": [
                 "CONFIG_OTA_URL=\"https://api.tenclass.net/xiaozhi/ota/\"",
                 "CONFIG_FLASH_CUSTOM_ASSETS=y",
-                "CONFIG_CUSTOM_ASSETS_FILE=\"assets.bin\"",
+                "CONFIG_CUSTOM_ASSETS_FILE=\"themes/dasai-mochi.bin\"",
                 "CONFIG_LANGUAGE_VI_VN=y",
                 "CONFIG_SR_WN_WN9_SOPHIA_TTS=y"
             ]

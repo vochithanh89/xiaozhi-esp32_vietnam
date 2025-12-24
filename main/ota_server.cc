@@ -20,11 +20,8 @@ const char* kTag = "OTA_WEB";
 
 extern const uint8_t ota_index_html_start[] asm("_binary_ota_index_html_start");
 extern const uint8_t ota_index_html_end[] asm("_binary_ota_index_html_end");
-extern const uint8_t assets_index_html_start[] asm("_binary_assets_index_html_start");
-extern const uint8_t assets_index_html_end[] asm("_binary_assets_index_html_end");
 
 const char* kOtaIndexHtml = reinterpret_cast<const char*>(ota_index_html_start);
-const char* kAssetIndexHtml = reinterpret_cast<const char*>(assets_index_html_start);
 }  // namespace
 
 // Singleton implementation
@@ -52,7 +49,7 @@ esp_err_t OtaServer::Start(int port) {
   }
 
   httpd_uri_t ota_get = {
-      .uri = "/ota",
+      .uri = "/",
       .method = HTTP_GET,
       .handler = HandleOtaGet,
       .user_ctx = nullptr};
@@ -64,13 +61,6 @@ esp_err_t OtaServer::Start(int port) {
       .handler = HandleOtaUpload,
       .user_ctx = nullptr};
   httpd_register_uri_handler(server_handle_, &ota_upload);
-
-  httpd_uri_t assets_get = {
-      .uri = "/assets",
-      .method = HTTP_GET,
-      .handler = HandleAssetsGet,
-      .user_ctx = nullptr};
-  httpd_register_uri_handler(server_handle_, &assets_get);
 
   httpd_uri_t assets_upload = {
       .uri = "/assets_upload",
@@ -501,13 +491,6 @@ Content-Type: application/octet-stream
   vTaskDelay(pdMS_TO_TICKS(2000));
   esp_restart();
 
-  return ESP_OK;
-}
-
-esp_err_t OtaServer::HandleAssetsGet(httpd_req_t* req) {
-  httpd_resp_set_type(req, "text/html");
-  httpd_resp_send(req, kAssetIndexHtml,
-                  assets_index_html_end - assets_index_html_start);
   return ESP_OK;
 }
 

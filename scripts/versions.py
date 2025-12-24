@@ -60,6 +60,8 @@ def get_app_desc(data):
 
 def get_board_name(folder):
     basename = os.path.basename(folder)
+    if basename.startswith("ct03dev"):
+        return "ct03dev-assistant"
     if basename.startswith("v0.2"):
         return "bread-simple"
     if basename.startswith("v0.3") or basename.startswith("v0.4") or basename.startswith("v0.5") or basename.startswith("v0.6"):

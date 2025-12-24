@@ -901,6 +901,12 @@ if ("${size}" AND "${offset}")
         build_default_assets_bin()
         esptool_py_flash_to_partition(flash "assets" "${GENERATED_ASSETS_LOCAL_FILE}")
         message(STATUS "Generated default assets flash configured: ${GENERATED_ASSETS_LOCAL_FILE} -> assets partition")
+    elseif(FLASH_DASAI_MOCHI_ASSETS)
+        # Flash Dasai Mochi assets
+        set(ASSETS_LOCAL_FILE "themes/dasai_mochi.bin")
+        get_assets_local_file("${CONFIG_CUSTOM_ASSETS_FILE}" ASSETS_LOCAL_FILE)
+        esptool_py_flash_to_partition(flash "assets" "${ASSETS_LOCAL_FILE}")
+        message(STATUS "Dasai Mochi assets flash configured: ${ASSETS_LOCAL_FILE} -> assets partition")
     elseif(CONFIG_FLASH_CUSTOM_ASSETS)
         # Flash custom assets
         get_assets_local_file("${CONFIG_CUSTOM_ASSETS_FILE}" ASSETS_LOCAL_FILE)

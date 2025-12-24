@@ -566,7 +566,7 @@ void Application::Start() {
 
     has_server_time_ = ota.HasServerTime();
     if (protocol_started) {
-        std::string message = std::string(Lang::Strings::VERSION) + ota.GetCurrentVersion();
+        std::string message = std::string(Lang::Strings::VERSION) + '-' + ota.GetCurrentVersion();
         display->ShowNotification(message.c_str());
         display->SetChatMessage("system", "");
         // Play the success sound to indicate the device is ready

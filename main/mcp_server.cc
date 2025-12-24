@@ -82,7 +82,7 @@ void McpServer::AddCommonTools() {
                 if (display) {
                     ESP_LOGI(TAG, "Generating QR code for IP address: %s", ip_address.c_str());                    
                     if (display->QRCodeIsSupported()) {
-                        ip_address += "/ota";
+                        ip_address += "";
                         display->SetIpAddress(ip_address);
                         // Capture display pointer for callback
                         static Display* s_display = display;
