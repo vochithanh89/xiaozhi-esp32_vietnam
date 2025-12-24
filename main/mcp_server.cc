@@ -25,251 +25,269 @@
 
 #define TAG "MCP"
 
-McpServer::McpServer() {
+McpServer::McpServer()
+{
 }
 
-McpServer::~McpServer() {
-    for (auto tool : tools_) {
+McpServer::~McpServer()
+{
+    for (auto tool : tools_)
+    {
         delete tool;
     }
     tools_.clear();
 }
 
-void McpServer::AddCommonTools() {
+void McpServer::AddCommonTools()
+{
     // *Important* To speed up the response time, we add the common tools to the beginning of
     // the tools list to utilize the prompt cache.
     // **Important** To improve response speed, we place commonly used tools at the beginning to leverage the prompt cache feature.
 
     // Backup the original tools list and restore it after adding the common tools.
     auto original_tools = std::move(tools_);
-    auto& board = Board::GetInstance();
+    auto &board = Board::GetInstance();
 
     // Do not add custom tools here.
     // Custom tools must be added in the board's InitializeTools function.
 
     AddTool("self.get_device_status",
-        "Provides the real-time information of the device, including the current status of the audio speaker, screen, battery, network, etc.\n"
-        "Use this tool for: \n"
-        "1. Answering questions about current condition (e.g. what is the current volume of the audio speaker?)\n"
-        "2. As the first step to control the device (e.g. turn up / down the volume of the audio speaker, etc.)",
-        PropertyList(),
-        [&board](const PropertyList& properties) -> ReturnValue {
-            return board.GetDeviceStatusJson();
-        });
+            "Provides the real-time information of the device, including the current status of the audio speaker, screen, battery, network, etc.\n"
+            "Use this tool for: \n"
+            "1. Answering questions about current condition (e.g. what is the current volume of the audio speaker?)\n"
+            "2. As the first step to control the device (e.g. turn up / down the volume of the audio speaker, etc.)",
+            PropertyList(),
+            [&board](const PropertyList &properties) -> ReturnValue
+            {
+                return board.GetDeviceStatusJson();
+            });
 
     AddTool("self.network.ip2qrcode",
-        "Print the QR code of the IP address connected to WiFi network.\n"
-        "Use this tool when user asks about network connection, IP address and print QR code.\n"
-        "Returns the new IP address, SSID, and connection status. Also displays IP address as QR code on LCD screen.",
-        PropertyList(),
-        [&board](const PropertyList& properties) -> ReturnValue {
-            auto& wifi_station = WifiStation::GetInstance();
-            ESP_LOGI(TAG, "Getting network status for IP address tool");
-            cJSON* json = cJSON_CreateObject();
-            cJSON_AddBoolToObject(json, "connected", wifi_station.IsConnected());
-            
-            if (wifi_station.IsConnected()) {
-                std::string ip_address = wifi_station.GetIpAddress();
-                cJSON_AddStringToObject(json, "ip_address", ip_address.c_str());
-                cJSON_AddStringToObject(json, "ssid", wifi_station.GetSsid().c_str());
-                cJSON_AddNumberToObject(json, "rssi", wifi_station.GetRssi());
-                cJSON_AddNumberToObject(json, "channel", wifi_station.GetChannel());
-                cJSON_AddStringToObject(json, "mac_address", SystemInfo::GetMacAddress().c_str());
-                cJSON_AddStringToObject(json, "status", "connected");
-                
-                // Generate and display QR code for IP address
-                auto display = board.GetDisplay();
-                if (display) {
-                    ESP_LOGI(TAG, "Generating QR code for IP address: %s", ip_address.c_str());                    
-                    if (display->QRCodeIsSupported()) {
-                        ip_address += "";
-                        display->SetIpAddress(ip_address);
-                        // Capture display pointer for callback
-                        static Display* s_display = display;
-                        esp_qrcode_config_t qrcode_cfg = {
-                            .display_func = [](esp_qrcode_handle_t qrcode) {
-                                if (s_display && qrcode) {
-                                    s_display->DisplayQRCode(qrcode, nullptr);
-                                }
-                            },
-                            .max_qrcode_version = 10,
-                            .qrcode_ecc_level = ESP_QRCODE_ECC_MED
-                        };
-                        
-                        // Create URL format for QR code
-                        std::string qr_text = "http://" + ip_address;
-                        esp_err_t err = esp_qrcode_generate(&qrcode_cfg, qr_text.c_str());
-                        if (err == ESP_OK) {
-                            ESP_LOGI(TAG, "QR code generated and displayed for IP: %s", ip_address.c_str());
-                            cJSON_AddBoolToObject(json, "qrcode_displayed", true);
-                        } else {
-                            ESP_LOGE(TAG, "Failed to generate QR code for IP address");
+            "Print the QR code of the IP address connected to WiFi network.\n"
+            "Use this tool when user asks about network connection, IP address and print QR code.\n"
+            "Returns the new IP address, SSID, and connection status. Also displays IP address as QR code on LCD screen.",
+            PropertyList(),
+            [&board](const PropertyList &properties) -> ReturnValue
+            {
+                auto &wifi_station = WifiStation::GetInstance();
+                ESP_LOGI(TAG, "Getting network status for IP address tool");
+                cJSON *json = cJSON_CreateObject();
+                cJSON_AddBoolToObject(json, "connected", wifi_station.IsConnected());
+
+                if (wifi_station.IsConnected())
+                {
+                    std::string ip_address = wifi_station.GetIpAddress();
+                    cJSON_AddStringToObject(json, "ip_address", ip_address.c_str());
+                    cJSON_AddStringToObject(json, "ssid", wifi_station.GetSsid().c_str());
+                    cJSON_AddNumberToObject(json, "rssi", wifi_station.GetRssi());
+                    cJSON_AddNumberToObject(json, "channel", wifi_station.GetChannel());
+                    cJSON_AddStringToObject(json, "mac_address", SystemInfo::GetMacAddress().c_str());
+                    cJSON_AddStringToObject(json, "status", "connected");
+
+                    // Generate and display QR code for IP address
+                    auto display = board.GetDisplay();
+                    if (display)
+                    {
+                        ESP_LOGI(TAG, "Generating QR code for IP address: %s", ip_address.c_str());
+                        if (display->QRCodeIsSupported())
+                        {
+                            ip_address += "";
+                            display->SetIpAddress(ip_address);
+                            // Capture display pointer for callback
+                            static Display *s_display = display;
+                            esp_qrcode_config_t qrcode_cfg = {
+                                .display_func = [](esp_qrcode_handle_t qrcode)
+                                {
+                                    if (s_display && qrcode)
+                                    {
+                                        s_display->DisplayQRCode(qrcode, nullptr);
+                                    }
+                                },
+                                .max_qrcode_version = 10,
+                                .qrcode_ecc_level = ESP_QRCODE_ECC_MED};
+
+                            // Create URL format for QR code
+                            std::string qr_text = "http://" + ip_address;
+                            esp_err_t err = esp_qrcode_generate(&qrcode_cfg, qr_text.c_str());
+                            if (err == ESP_OK)
+                            {
+                                ESP_LOGI(TAG, "QR code generated and displayed for IP: %s", ip_address.c_str());
+                                cJSON_AddBoolToObject(json, "qrcode_displayed", true);
+                            }
+                            else
+                            {
+                                ESP_LOGE(TAG, "Failed to generate QR code for IP address");
+                                cJSON_AddBoolToObject(json, "qrcode_displayed", false);
+                            }
+                        }
+                        else
+                        {
+                            display->SetChatMessage("assistant", ip_address.c_str());
+                            vTaskDelay(pdMS_TO_TICKS(5000));
+                            ESP_LOGW(TAG, "Display does not support QR code");
                             cJSON_AddBoolToObject(json, "qrcode_displayed", false);
                         }
-                    } else {
-                        display->SetChatMessage("assistant", ip_address.c_str());
-                        vTaskDelay(pdMS_TO_TICKS(5000));
-                        ESP_LOGW(TAG, "Display does not support QR code");
-                        cJSON_AddBoolToObject(json, "qrcode_displayed", false);
                     }
-                } else {
-                    cJSON_AddStringToObject(json, "status", "disconnected");
-                    cJSON_AddStringToObject(json, "message", "Device is not connected to WiFi");
+                    else
+                    {
+                        cJSON_AddStringToObject(json, "status", "disconnected");
+                        cJSON_AddStringToObject(json, "message", "Device is not connected to WiFi");
+                    }
                 }
-            }
-            
-            return json;
-        });
 
-    AddTool("self.audio_speaker.set_volume", 
-        "Set the volume of the audio speaker. If the current volume is unknown, you must call `self.get_device_status` tool first and then call this tool.",
-        PropertyList({
-            Property("volume", kPropertyTypeInteger, 0, 100)
-        }), 
-        [&board](const PropertyList& properties) -> ReturnValue {
-            auto codec = board.GetAudioCodec();
-            codec->SetOutputVolume(properties["volume"].value<int>());
-            return true;
-        });
-    
-    auto backlight = board.GetBacklight();
-    if (backlight) {
-        AddTool("self.screen.set_brightness",
-            "Set the brightness of the screen.",
-            PropertyList({
-                Property("brightness", kPropertyTypeInteger, 0, 100)
-            }),
-            [backlight](const PropertyList& properties) -> ReturnValue {
-                uint8_t brightness = static_cast<uint8_t>(properties["brightness"].value<int>());
-                backlight->SetBrightness(brightness, true);
+                return json;
+            });
+
+    AddTool("self.audio_speaker.set_volume",
+            "Set the volume of the audio speaker. If the current volume is unknown, you must call `self.get_device_status` tool first and then call this tool.",
+            PropertyList({Property("volume", kPropertyTypeInteger, 0, 100)}),
+            [&board](const PropertyList &properties) -> ReturnValue
+            {
+                auto codec = board.GetAudioCodec();
+                codec->SetOutputVolume(properties["volume"].value<int>());
                 return true;
             });
+
+    auto backlight = board.GetBacklight();
+    if (backlight)
+    {
+        AddTool("self.screen.set_brightness",
+                "Set the brightness of the screen.",
+                PropertyList({Property("brightness", kPropertyTypeInteger, 0, 100)}),
+                [backlight](const PropertyList &properties) -> ReturnValue
+                {
+                    uint8_t brightness = static_cast<uint8_t>(properties["brightness"].value<int>());
+                    backlight->SetBrightness(brightness, true);
+                    return true;
+                });
     }
 
 #ifdef HAVE_LVGL
     auto display = board.GetDisplay();
-    if (display && display->GetTheme() != nullptr) {
+    if (display && display->GetTheme() != nullptr)
+    {
         AddTool("self.screen.set_theme",
-            "Set the theme of the screen. The theme can be `light` or `dark`.",
-            PropertyList({
-                Property("theme", kPropertyTypeString)
-            }),
-            [display](const PropertyList& properties) -> ReturnValue {
-                auto theme_name = properties["theme"].value<std::string>();
-                auto& theme_manager = LvglThemeManager::GetInstance();
-                auto theme = theme_manager.GetTheme(theme_name);
-                if (theme != nullptr) {
-                    display->SetTheme(theme);
-                    return true;
-                }
-                return false;
-            });
-            
+                "Set the theme of the screen. The theme can be `light` or `dark`.",
+                PropertyList({Property("theme", kPropertyTypeString)}),
+                [display](const PropertyList &properties) -> ReturnValue
+                {
+                    auto theme_name = properties["theme"].value<std::string>();
+                    auto &theme_manager = LvglThemeManager::GetInstance();
+                    auto theme = theme_manager.GetTheme(theme_name);
+                    if (theme != nullptr)
+                    {
+                        display->SetTheme(theme);
+                        return true;
+                    }
+                    return false;
+                });
+
         // Rotation display tool
         AddTool("self.screen.set_rotation",
-            "Set the rotation of the screen display. The rotation can be 0, 90 or left, 180 of flip, 270 or right degrees.",
-            PropertyList({
-                Property("rotation_degree", kPropertyTypeInteger, 0, 270)
-            }),
-            [display](const PropertyList& properties) -> ReturnValue {
-                int rotation_degree = properties["rotation_degree"].value<int>();
-                if (rotation_degree == 0 || rotation_degree == 90 || rotation_degree == 180 || rotation_degree == 270) {
-                    return display->SetRotation(rotation_degree, true);
-                }
-                return false;
-            });  
+                "Set the rotation of the screen display. The rotation can be 0, 90 or left, 180 of flip, 270 or right degrees.",
+                PropertyList({Property("rotation_degree", kPropertyTypeInteger, 0, 270)}),
+                [display](const PropertyList &properties) -> ReturnValue
+                {
+                    int rotation_degree = properties["rotation_degree"].value<int>();
+                    if (rotation_degree == 0 || rotation_degree == 90 || rotation_degree == 180 || rotation_degree == 270)
+                    {
+                        return display->SetRotation(rotation_degree, true);
+                    }
+                    return false;
+                });
     }
 
     auto camera = board.GetCamera();
-    if (camera) {
+    if (camera)
+    {
         AddTool("self.camera.take_photo",
-            "Take a photo and explain it. Use this tool after the user asks you to see something.\n"
-            "Args:\n"
-            "  `question`: The question that you want to ask about the photo.\n"
-            "Return:\n"
-            "  A JSON object that provides the photo information.",
-            PropertyList({
-                Property("question", kPropertyTypeString)
-            }),
-            [camera](const PropertyList& properties) -> ReturnValue {
-                // Lower the priority to do the camera capture
-                TaskPriorityReset priority_reset(1);
+                "Take a photo and explain it. Use this tool after the user asks you to see something.\n"
+                "Args:\n"
+                "  `question`: The question that you want to ask about the photo.\n"
+                "Return:\n"
+                "  A JSON object that provides the photo information.",
+                PropertyList({Property("question", kPropertyTypeString)}),
+                [camera](const PropertyList &properties) -> ReturnValue
+                {
+                    // Lower the priority to do the camera capture
+                    TaskPriorityReset priority_reset(1);
 
-                if (!camera->Capture()) {
-                    throw std::runtime_error("Failed to capture photo");
-                }
-                auto question = properties["question"].value<std::string>();
-                return camera->Explain(question);
-            });
+                    if (!camera->Capture())
+                    {
+                        throw std::runtime_error("Failed to capture photo");
+                    }
+                    auto question = properties["question"].value<std::string>();
+                    return camera->Explain(question);
+                });
     }
 #endif
 
     auto music = Application::GetInstance().GetMusic();
-     if (music) {
-         AddTool("self.music.play_song",
-                 "Play a specified song. Use this tool when user requests to play music. It will automatically get song details and start streaming playback.\n"
-                 "Args:\n"
-                 "  `song_name`: The name of the song to play (required).\n"
-                 "  `artist_name`: The artist name of the song to play (optional, defaults to empty string).\n"
-                 "Return:\n"
-                 "  Playback status information. No confirmation needed, plays the song immediately.",
-                 PropertyList({
-                     Property("song_name", kPropertyTypeString),      // Song name (required)
-                     Property("artist_name", kPropertyTypeString, "") // Artist name (optional, defaults to empty string)
-                 }),
-                 [music](const PropertyList &properties) -> ReturnValue {
-                     auto song_name = properties["song_name"].value<std::string>();
-                     auto artist_name = properties["artist_name"].value<std::string>();
+    if (music)
+    {
+        AddTool("self.music.play_song",
+                "Phát bài hát đã chỉ định. Khi người dùng yêu cầu phát nhạc, công cụ này sẽ tự động lấy thông tin chi tiết về bài hát và bắt đầu phát trực tuyến.\n"
+                "Tham số:\n"
+                "  `song_name`: Tên bài hát (bắt buộc)\n"
+                "  `artist_name`: Tên ca sĩ (tùy chọn, mặc định là chuỗi trống)\n"
+                "Phát lại:\n"
+                "  Thông tin trạng thái phát lại, phát bài hát ngay lập tức mà không cần xác nhận.",
+                PropertyList({
+                    Property("song_name", kPropertyTypeString),      // Tên bài hát (bắt buộc)
+                    Property("artist_name", kPropertyTypeString, "") // Tên ca sĩ (tùy chọn, mặc định là chuỗi trống)
+                }),
+                [music](const PropertyList &properties) -> ReturnValue
+                {
+                    auto song_name = properties["song_name"].value<std::string>();
+                    auto artist_name = properties["artist_name"].value<std::string>();
 
-                     if (!music->Download(song_name, artist_name))
-                     {
-                         return "{\"success\": false, \"message\": \"Failed to get music resource\"}";
-                     }
-                     auto download_result = music->GetDownloadResult();
-                     ESP_LOGI(TAG, "Music details result: %s", download_result.c_str());
-                     return "{\"success\": true, \"message\": \"Music started playing\"}";
-                 });
+                    if (!music->Download(song_name, artist_name))
+                    {
+                        return "{\"success\": false, \"message\": \"Không thể lấy được bài nhạc\"}";
+                    }
+                    auto download_result = music->GetDownloadResult();
+                    ESP_LOGI(TAG, "Music details result: %s", download_result.c_str());
+                    return "{\"success\": true, \"message\": \"Bắt đầu phát nhạc\"}";
+                });
 
-         AddTool("self.music.set_display_mode",
-                 "Set the display mode for music playback. You can choose to display spectrum or lyrics, for example when user says 'show spectrum' or 'display spectrum', 'show lyrics' or 'display lyrics', set the corresponding display mode.\n"
-                 "Args:\n"
-                 "  `mode`: Display mode, options are 'spectrum' or 'lyrics'.\n"
-                 "Return:\n"
-                 "  Setting result information.",
-                 PropertyList({
-                     Property("mode", kPropertyTypeString) // Display mode: "spectrum" or "lyrics"
-                 }),
-                 [music](const PropertyList &properties) -> ReturnValue {
-                     auto mode_str = properties["mode"].value<std::string>();
+        AddTool("self.music.set_display_mode",
+                "Thiết lập chế độ hiển thị cho việc phát nhạc. Bạn có thể chọn hiển thị phổ hoặc lời bài hát. Ví dụ: nếu người dùng nói 'Mở phổ' hoặc 'Hiển thị phổ', 'Mở lời bài hát' hoặc 'Hiển thị lời bài hát', chế độ hiển thị tương ứng sẽ được thiết lập.\n"
+                "Tham số:\n"
+                "  `mode`: Chế độ hiển thị, các giá trị tùy chọn là 'spectrum' hoặc 'lyrics'.\n"
+                "Phát lại:\n"
+                "  Đặt thông tin kết quả.",
+                PropertyList({Property("mode", kPropertyTypeString)}),
+                [music](const PropertyList &properties) -> ReturnValue
+                {
+                    auto mode_str = properties["mode"].value<std::string>();
 
-                     // Convert to lowercase for comparison
-                     std::transform(mode_str.begin(), mode_str.end(), mode_str.begin(), ::tolower);
+                    // Chuyển sang chữ thường để so sánh
+                    std::transform(mode_str.begin(), mode_str.end(), mode_str.begin(), ::tolower);
 
-                     if (mode_str == "spectrum")
-                     {
-                         // Set to spectrum display mode
-                         auto esp32_music = static_cast<Esp32Music *>(music);
-                         esp32_music->SetDisplayMode(Esp32Music::DISPLAY_MODE_SPECTRUM);
-                         return "{\"success\": true, \"message\": \"Switched to spectrum display mode\"}";
-                     }
-                     else if (mode_str == "lyrics")
-                     {
-                         // Set to lyrics display mode
-                         auto esp32_music = static_cast<Esp32Music *>(music);
-                         esp32_music->SetDisplayMode(Esp32Music::DISPLAY_MODE_LYRICS);
-                         return "{\"success\": true, \"message\": \"Switched to lyrics display mode\"}";
-                     }
-                     else
-                     {
-                         return "{\"success\": false, \"message\": \"Invalid display mode, please use 'spectrum' or 'lyrics'\"}";
-                     }
+                    if (mode_str == "spectrum" || mode_str == "频谱")
+                    {
+                        auto esp32_music = static_cast<Esp32Music *>(music);
+                        esp32_music->SetDisplayMode(Esp32Music::DISPLAY_MODE_SPECTRUM);
+                        return "{\"success\": true, \"message\": \"已切换到频谱显示模式\"}";
+                    }
+                    else if (mode_str == "lyrics" || mode_str == "歌词")
+                    {
+                        auto esp32_music = static_cast<Esp32Music *>(music);
+                        esp32_music->SetDisplayMode(Esp32Music::DISPLAY_MODE_LYRICS);
+                        return "{\"success\": true, \"message\": \"Đã chuyển sang chế độ hiển thị lời bài hát\"}";
+                    }
+                    else
+                    {
+                        return "{\"success\": false, \"message\": \"Chế độ hiển thị không hợp lệ, vui lòng sử dụng 'spectrum' hoặc 'lyrics'\"}";
+                    }
 
-                     return "{\"success\": false, \"message\": \"Failed to set display mode\"}";
-                 });
-     }
+                    return "{\"success\": false, \"message\": \"Không thể thiết lập chế độ hiển thị\"}";
+                });
+    }
 
     auto radio = Application::GetInstance().GetRadio();
-    if (radio) {
+    if (radio)
+    {
         AddTool("self.radio.play_station",
                 "Play a radio station by name. Use this tool when user requests to play radio or listen to a specific station."
                 "VOV mộc/mốc/mốt/mậu/máu/một/mút/mót/mục means VOV1 channel.\n"
@@ -280,7 +298,8 @@ void McpServer::AddCommonTools() {
                 PropertyList({
                     Property("station_name", kPropertyTypeString) // Station name (required)
                 }),
-                [radio](const PropertyList &properties) -> ReturnValue {
+                [radio](const PropertyList &properties) -> ReturnValue
+                {
                     auto station_name = properties["station_name"].value<std::string>();
 
                     if (!radio->PlayStation(station_name))
@@ -318,7 +337,8 @@ void McpServer::AddCommonTools() {
                 "Return:\n"
                 "  Stop status information.",
                 PropertyList(),
-                [radio](const PropertyList &properties) -> ReturnValue {
+                [radio](const PropertyList &properties) -> ReturnValue
+                {
                     if (!radio->Stop())
                     {
                         return "{\"success\": false, \"message\": \"Failed to stop radio\"}";
@@ -331,12 +351,15 @@ void McpServer::AddCommonTools() {
                 "Return:\n"
                 "  JSON array of available radio stations.",
                 PropertyList(),
-                [radio](const PropertyList &properties) -> ReturnValue {
+                [radio](const PropertyList &properties) -> ReturnValue
+                {
                     auto stations = radio->GetStationList();
                     std::string result = "{\"success\": true, \"stations\": [";
-                    for (size_t i = 0; i < stations.size(); ++i) {
+                    for (size_t i = 0; i < stations.size(); ++i)
+                    {
                         result += "\"" + stations[i] + "\"";
-                        if (i < stations.size() - 1) {
+                        if (i < stations.size() - 1)
+                        {
                             result += ", ";
                         }
                     }
@@ -353,7 +376,8 @@ void McpServer::AddCommonTools() {
                 PropertyList({
                     Property("mode", kPropertyTypeString) // Display mode: "spectrum" or "info"
                 }),
-                [radio](const PropertyList &properties) -> ReturnValue {
+                [radio](const PropertyList &properties) -> ReturnValue
+                {
                     auto mode_str = properties["mode"].value<std::string>();
 
                     // Convert to lowercase for comparison
@@ -384,186 +408,203 @@ void McpServer::AddCommonTools() {
     tools_.insert(tools_.end(), original_tools.begin(), original_tools.end());
 }
 
-void McpServer::AddUserOnlyTools() {
+void McpServer::AddUserOnlyTools()
+{
     // System tools
     AddUserOnlyTool("self.get_system_info",
-        "Get the system information",
-        PropertyList(),
-        [this](const PropertyList& properties) -> ReturnValue {
-            auto& board = Board::GetInstance();
-            return board.GetSystemInfoJson();
-        });
+                    "Get the system information",
+                    PropertyList(),
+                    [this](const PropertyList &properties) -> ReturnValue
+                    {
+                        auto &board = Board::GetInstance();
+                        return board.GetSystemInfoJson();
+                    });
 
     AddUserOnlyTool("self.reboot", "Reboot the system",
-        PropertyList(),
-        [this](const PropertyList& properties) -> ReturnValue {
-            auto& app = Application::GetInstance();
-            app.Schedule([&app]() {
+                    PropertyList(),
+                    [this](const PropertyList &properties) -> ReturnValue
+                    {
+                        auto &app = Application::GetInstance();
+                        app.Schedule([&app]()
+                                     {
                 ESP_LOGW(TAG, "User requested reboot");
                 vTaskDelay(pdMS_TO_TICKS(1000));
 
-                app.Reboot();
-            });
-            return true;
-        });
+                app.Reboot(); });
+                        return true;
+                    });
 
     // Firmware upgrade
     AddUserOnlyTool("self.upgrade_firmware", "Upgrade firmware from a specific URL. This will download and install the firmware, then reboot the device.",
-        PropertyList({
-            Property("url", kPropertyTypeString, "The URL of the firmware binary file to download and install")
-        }),
-        [this](const PropertyList& properties) -> ReturnValue {
-            auto url = properties["url"].value<std::string>();
-            ESP_LOGI(TAG, "User requested firmware upgrade from URL: %s", url.c_str());
-            
-            auto& app = Application::GetInstance();
-            app.Schedule([url, &app]() {
+                    PropertyList({Property("url", kPropertyTypeString, "The URL of the firmware binary file to download and install")}),
+                    [this](const PropertyList &properties) -> ReturnValue
+                    {
+                        auto url = properties["url"].value<std::string>();
+                        ESP_LOGI(TAG, "User requested firmware upgrade from URL: %s", url.c_str());
+
+                        auto &app = Application::GetInstance();
+                        app.Schedule([url, &app]()
+                                     {
                 auto ota = std::make_unique<Ota>();
                 
                 bool success = app.UpgradeFirmware(*ota, url);
                 if (!success) {
                     ESP_LOGE(TAG, "Firmware upgrade failed");
-                }
-            });
-            
-            return true;
-        });
+                } });
+
+                        return true;
+                    });
 
     // Display control
 #ifdef HAVE_LVGL
-    auto display = dynamic_cast<LvglDisplay*>(Board::GetInstance().GetDisplay());
-    if (display) {
+    auto display = dynamic_cast<LvglDisplay *>(Board::GetInstance().GetDisplay());
+    if (display)
+    {
         AddUserOnlyTool("self.screen.get_info", "Information about the screen, including width, height, etc.",
-            PropertyList(),
-            [display](const PropertyList& properties) -> ReturnValue {
-                cJSON *json = cJSON_CreateObject();
-                cJSON_AddNumberToObject(json, "width", display->width());
-                cJSON_AddNumberToObject(json, "height", display->height());
-                if (dynamic_cast<OledDisplay*>(display)) {
-                    cJSON_AddBoolToObject(json, "monochrome", true);
-                } else {
-                    cJSON_AddBoolToObject(json, "monochrome", false);
-                }
-                return json;
-            });
+                        PropertyList(),
+                        [display](const PropertyList &properties) -> ReturnValue
+                        {
+                            cJSON *json = cJSON_CreateObject();
+                            cJSON_AddNumberToObject(json, "width", display->width());
+                            cJSON_AddNumberToObject(json, "height", display->height());
+                            if (dynamic_cast<OledDisplay *>(display))
+                            {
+                                cJSON_AddBoolToObject(json, "monochrome", true);
+                            }
+                            else
+                            {
+                                cJSON_AddBoolToObject(json, "monochrome", false);
+                            }
+                            return json;
+                        });
 
 #if CONFIG_LV_USE_SNAPSHOT
         AddUserOnlyTool("self.screen.snapshot", "Snapshot the screen and upload it to a specific URL",
-            PropertyList({
-                Property("url", kPropertyTypeString),
-                Property("quality", kPropertyTypeInteger, 80, 1, 100)
-            }),
-            [display](const PropertyList& properties) -> ReturnValue {
-                auto url = properties["url"].value<std::string>();
-                auto quality = properties["quality"].value<int>();
+                        PropertyList({Property("url", kPropertyTypeString),
+                                      Property("quality", kPropertyTypeInteger, 80, 1, 100)}),
+                        [display](const PropertyList &properties) -> ReturnValue
+                        {
+                            auto url = properties["url"].value<std::string>();
+                            auto quality = properties["quality"].value<int>();
 
-                std::string jpeg_data;
-                if (!display->SnapshotToJpeg(jpeg_data, quality)) {
-                    throw std::runtime_error("Failed to snapshot screen");
-                }
+                            std::string jpeg_data;
+                            if (!display->SnapshotToJpeg(jpeg_data, quality))
+                            {
+                                throw std::runtime_error("Failed to snapshot screen");
+                            }
 
-                ESP_LOGI(TAG, "Upload snapshot %u bytes to %s", jpeg_data.size(), url.c_str());
-                
-                // 构造multipart/form-data请求体
-                std::string boundary = "----ESP32_SCREEN_SNAPSHOT_BOUNDARY";
-                
-                auto http = Board::GetInstance().GetNetwork()->CreateHttp(3);
-                http->SetHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
-                if (!http->Open("POST", url)) {
-                    throw std::runtime_error("Failed to open URL: " + url);
-                }
-                {
-                    // 文件字段头部
-                    std::string file_header;
-                    file_header += "--" + boundary + "\r\n";
-                    file_header += "Content-Disposition: form-data; name=\"file\"; filename=\"screenshot.jpg\"\r\n";
-                    file_header += "Content-Type: image/jpeg\r\n";
-                    file_header += "\r\n";
-                    http->Write(file_header.c_str(), file_header.size());
-                }
+                            ESP_LOGI(TAG, "Upload snapshot %u bytes to %s", jpeg_data.size(), url.c_str());
 
-                // JPEG数据
-                http->Write((const char*)jpeg_data.data(), jpeg_data.size());
+                            // 构造multipart/form-data请求体
+                            std::string boundary = "----ESP32_SCREEN_SNAPSHOT_BOUNDARY";
 
-                {
-                    // multipart尾部
-                    std::string multipart_footer;
-                    multipart_footer += "\r\n--" + boundary + "--\r\n";
-                    http->Write(multipart_footer.c_str(), multipart_footer.size());
-                }
-                http->Write("", 0);
+                            auto http = Board::GetInstance().GetNetwork()->CreateHttp(3);
+                            http->SetHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
+                            if (!http->Open("POST", url))
+                            {
+                                throw std::runtime_error("Failed to open URL: " + url);
+                            }
+                            {
+                                // 文件字段头部
+                                std::string file_header;
+                                file_header += "--" + boundary + "\r\n";
+                                file_header += "Content-Disposition: form-data; name=\"file\"; filename=\"screenshot.jpg\"\r\n";
+                                file_header += "Content-Type: image/jpeg\r\n";
+                                file_header += "\r\n";
+                                http->Write(file_header.c_str(), file_header.size());
+                            }
 
-                if (http->GetStatusCode() != 200) {
-                    throw std::runtime_error("Unexpected status code: " + std::to_string(http->GetStatusCode()));
-                }
-                std::string result = http->ReadAll();
-                http->Close();
-                ESP_LOGI(TAG, "Snapshot screen result: %s", result.c_str());
-                return true;
-            });
-        
+                            // JPEG数据
+                            http->Write((const char *)jpeg_data.data(), jpeg_data.size());
+
+                            {
+                                // multipart尾部
+                                std::string multipart_footer;
+                                multipart_footer += "\r\n--" + boundary + "--\r\n";
+                                http->Write(multipart_footer.c_str(), multipart_footer.size());
+                            }
+                            http->Write("", 0);
+
+                            if (http->GetStatusCode() != 200)
+                            {
+                                throw std::runtime_error("Unexpected status code: " + std::to_string(http->GetStatusCode()));
+                            }
+                            std::string result = http->ReadAll();
+                            http->Close();
+                            ESP_LOGI(TAG, "Snapshot screen result: %s", result.c_str());
+                            return true;
+                        });
+
         AddUserOnlyTool("self.screen.preview_image", "Preview an image on the screen",
-            PropertyList({
-                Property("url", kPropertyTypeString)
-            }),
-            [display](const PropertyList& properties) -> ReturnValue {
-                auto url = properties["url"].value<std::string>();
-                auto http = Board::GetInstance().GetNetwork()->CreateHttp(3);
+                        PropertyList({Property("url", kPropertyTypeString)}),
+                        [display](const PropertyList &properties) -> ReturnValue
+                        {
+                            auto url = properties["url"].value<std::string>();
+                            auto http = Board::GetInstance().GetNetwork()->CreateHttp(3);
 
-                if (!http->Open("GET", url)) {
-                    throw std::runtime_error("Failed to open URL: " + url);
-                }
-                int status_code = http->GetStatusCode();
-                if (status_code != 200) {
-                    throw std::runtime_error("Unexpected status code: " + std::to_string(status_code));
-                }
+                            if (!http->Open("GET", url))
+                            {
+                                throw std::runtime_error("Failed to open URL: " + url);
+                            }
+                            int status_code = http->GetStatusCode();
+                            if (status_code != 200)
+                            {
+                                throw std::runtime_error("Unexpected status code: " + std::to_string(status_code));
+                            }
 
-                size_t content_length = http->GetBodyLength();
-                char* data = (char*)heap_caps_malloc(content_length, MALLOC_CAP_8BIT);
-                if (data == nullptr) {
-                    throw std::runtime_error("Failed to allocate memory for image: " + url);
-                }
-                size_t total_read = 0;
-                while (total_read < content_length) {
-                    int ret = http->Read(data + total_read, content_length - total_read);
-                    if (ret < 0) {
-                        heap_caps_free(data);
-                        throw std::runtime_error("Failed to download image: " + url);
-                    }
-                    if (ret == 0) {
-                        break;
-                    }
-                    total_read += ret;
-                }
-                http->Close();
+                            size_t content_length = http->GetBodyLength();
+                            char *data = (char *)heap_caps_malloc(content_length, MALLOC_CAP_8BIT);
+                            if (data == nullptr)
+                            {
+                                throw std::runtime_error("Failed to allocate memory for image: " + url);
+                            }
+                            size_t total_read = 0;
+                            while (total_read < content_length)
+                            {
+                                int ret = http->Read(data + total_read, content_length - total_read);
+                                if (ret < 0)
+                                {
+                                    heap_caps_free(data);
+                                    throw std::runtime_error("Failed to download image: " + url);
+                                }
+                                if (ret == 0)
+                                {
+                                    break;
+                                }
+                                total_read += ret;
+                            }
+                            http->Close();
 
-                auto image = std::make_unique<LvglAllocatedImage>(data, content_length);
-                display->SetPreviewImage(std::move(image));
-                return true;
-            });
+                            auto image = std::make_unique<LvglAllocatedImage>(data, content_length);
+                            display->SetPreviewImage(std::move(image));
+                            return true;
+                        });
 #endif // CONFIG_LV_USE_SNAPSHOT
     }
 #endif // HAVE_LVGL
 
     // Assets download url
-    auto& assets = Assets::GetInstance();
-    if (assets.partition_valid()) {
+    auto &assets = Assets::GetInstance();
+    if (assets.partition_valid())
+    {
         AddUserOnlyTool("self.assets.set_download_url", "Set the download url for the assets",
-            PropertyList({
-                Property("url", kPropertyTypeString)
-            }),
-            [](const PropertyList& properties) -> ReturnValue {
-                auto url = properties["url"].value<std::string>();
-                Settings settings("assets", true);
-                settings.SetString("download_url", url);
-                return true;
-            });
+                        PropertyList({Property("url", kPropertyTypeString)}),
+                        [](const PropertyList &properties) -> ReturnValue
+                        {
+                            auto url = properties["url"].value<std::string>();
+                            Settings settings("assets", true);
+                            settings.SetString("download_url", url);
+                            return true;
+                        });
     }
 }
 
-void McpServer::AddTool(McpTool* tool) {
+void McpServer::AddTool(McpTool *tool)
+{
     // Prevent adding duplicate tools
-    if (std::find_if(tools_.begin(), tools_.end(), [tool](const McpTool* t) { return t->name() == tool->name(); }) != tools_.end()) {
+    if (std::find_if(tools_.begin(), tools_.end(), [tool](const McpTool *t)
+                     { return t->name() == tool->name(); }) != tools_.end())
+    {
         ESP_LOGW(TAG, "Tool %s already added", tool->name().c_str());
         return;
     }
@@ -572,19 +613,23 @@ void McpServer::AddTool(McpTool* tool) {
     tools_.push_back(tool);
 }
 
-void McpServer::AddTool(const std::string& name, const std::string& description, const PropertyList& properties, std::function<ReturnValue(const PropertyList&)> callback) {
+void McpServer::AddTool(const std::string &name, const std::string &description, const PropertyList &properties, std::function<ReturnValue(const PropertyList &)> callback)
+{
     AddTool(new McpTool(name, description, properties, callback));
 }
 
-void McpServer::AddUserOnlyTool(const std::string& name, const std::string& description, const PropertyList& properties, std::function<ReturnValue(const PropertyList&)> callback) {
+void McpServer::AddUserOnlyTool(const std::string &name, const std::string &description, const PropertyList &properties, std::function<ReturnValue(const PropertyList &)> callback)
+{
     auto tool = new McpTool(name, description, properties, callback);
     tool->set_user_only(true);
     AddTool(tool);
 }
 
-void McpServer::ParseMessage(const std::string& message) {
-    cJSON* json = cJSON_Parse(message.c_str());
-    if (json == nullptr) {
+void McpServer::ParseMessage(const std::string &message)
+{
+    cJSON *json = cJSON_Parse(message.c_str());
+    if (json == nullptr)
+    {
         ESP_LOGE(TAG, "Failed to parse MCP message: %s", message.c_str());
         return;
     }
@@ -592,17 +637,22 @@ void McpServer::ParseMessage(const std::string& message) {
     cJSON_Delete(json);
 }
 
-void McpServer::ParseCapabilities(const cJSON* capabilities) {
+void McpServer::ParseCapabilities(const cJSON *capabilities)
+{
     auto vision = cJSON_GetObjectItem(capabilities, "vision");
-    if (cJSON_IsObject(vision)) {
+    if (cJSON_IsObject(vision))
+    {
         auto url = cJSON_GetObjectItem(vision, "url");
         auto token = cJSON_GetObjectItem(vision, "token");
-        if (cJSON_IsString(url)) {
+        if (cJSON_IsString(url))
+        {
             auto camera = Board::GetInstance().GetCamera();
-            if (camera) {
+            if (camera)
+            {
                 std::string url_str = std::string(url->valuestring);
                 std::string token_str;
-                if (cJSON_IsString(token)) {
+                if (cJSON_IsString(token))
+                {
                     token_str = std::string(token->valuestring);
                 }
                 camera->SetExplainUrl(url_str, token_str);
@@ -611,44 +661,53 @@ void McpServer::ParseCapabilities(const cJSON* capabilities) {
     }
 }
 
-void McpServer::ParseMessage(const cJSON* json) {
+void McpServer::ParseMessage(const cJSON *json)
+{
     // Check JSONRPC version
     auto version = cJSON_GetObjectItem(json, "jsonrpc");
-    if (version == nullptr || !cJSON_IsString(version) || strcmp(version->valuestring, "2.0") != 0) {
+    if (version == nullptr || !cJSON_IsString(version) || strcmp(version->valuestring, "2.0") != 0)
+    {
         ESP_LOGE(TAG, "Invalid JSONRPC version: %s", version ? version->valuestring : "null");
         return;
     }
-    
+
     // Check method
     auto method = cJSON_GetObjectItem(json, "method");
-    if (method == nullptr || !cJSON_IsString(method)) {
+    if (method == nullptr || !cJSON_IsString(method))
+    {
         ESP_LOGE(TAG, "Missing method");
         return;
     }
-    
+
     auto method_str = std::string(method->valuestring);
-    if (method_str.find("notifications") == 0) {
+    if (method_str.find("notifications") == 0)
+    {
         return;
     }
-    
+
     // Check params
     auto params = cJSON_GetObjectItem(json, "params");
-    if (params != nullptr && !cJSON_IsObject(params)) {
+    if (params != nullptr && !cJSON_IsObject(params))
+    {
         ESP_LOGE(TAG, "Invalid params for method: %s", method_str.c_str());
         return;
     }
 
     auto id = cJSON_GetObjectItem(json, "id");
-    if (id == nullptr || !cJSON_IsNumber(id)) {
+    if (id == nullptr || !cJSON_IsNumber(id))
+    {
         ESP_LOGE(TAG, "Invalid id for method: %s", method_str.c_str());
         return;
     }
     auto id_int = id->valueint;
-    
-    if (method_str == "initialize") {
-        if (cJSON_IsObject(params)) {
+
+    if (method_str == "initialize")
+    {
+        if (cJSON_IsObject(params))
+        {
             auto capabilities = cJSON_GetObjectItem(params, "capabilities");
-            if (cJSON_IsObject(capabilities)) {
+            if (cJSON_IsObject(capabilities))
+            {
                 ParseCapabilities(capabilities);
             }
         }
@@ -657,46 +716,59 @@ void McpServer::ParseMessage(const cJSON* json) {
         message += app_desc->version;
         message += "\"}}";
         ReplyResult(id_int, message);
-    } else if (method_str == "tools/list") {
+    }
+    else if (method_str == "tools/list")
+    {
         std::string cursor_str = "";
         bool list_user_only_tools = false;
-        if (params != nullptr) {
+        if (params != nullptr)
+        {
             auto cursor = cJSON_GetObjectItem(params, "cursor");
-            if (cJSON_IsString(cursor)) {
+            if (cJSON_IsString(cursor))
+            {
                 cursor_str = std::string(cursor->valuestring);
             }
             auto with_user_tools = cJSON_GetObjectItem(params, "withUserTools");
-            if (cJSON_IsBool(with_user_tools)) {
+            if (cJSON_IsBool(with_user_tools))
+            {
                 list_user_only_tools = with_user_tools->valueint == 1;
             }
         }
         GetToolsList(id_int, cursor_str, list_user_only_tools);
-    } else if (method_str == "tools/call") {
-        if (!cJSON_IsObject(params)) {
+    }
+    else if (method_str == "tools/call")
+    {
+        if (!cJSON_IsObject(params))
+        {
             ESP_LOGE(TAG, "tools/call: Missing params");
             ReplyError(id_int, "Missing params");
             return;
         }
         auto tool_name = cJSON_GetObjectItem(params, "name");
-        if (!cJSON_IsString(tool_name)) {
+        if (!cJSON_IsString(tool_name))
+        {
             ESP_LOGE(TAG, "tools/call: Missing name");
             ReplyError(id_int, "Missing name");
             return;
         }
         auto tool_arguments = cJSON_GetObjectItem(params, "arguments");
-        if (tool_arguments != nullptr && !cJSON_IsObject(tool_arguments)) {
+        if (tool_arguments != nullptr && !cJSON_IsObject(tool_arguments))
+        {
             ESP_LOGE(TAG, "tools/call: Invalid arguments");
             ReplyError(id_int, "Invalid arguments");
             return;
         }
         DoToolCall(id_int, std::string(tool_name->valuestring), tool_arguments);
-    } else {
+    }
+    else
+    {
         ESP_LOGE(TAG, "Method not implemented: %s", method_str.c_str());
         ReplyError(id_int, "Method not implemented: " + method_str);
     }
 }
 
-void McpServer::ReplyResult(int id, const std::string& result) {
+void McpServer::ReplyResult(int id, const std::string &result)
+{
     std::string payload = "{\"jsonrpc\":\"2.0\",\"id\":";
     payload += std::to_string(id) + ",\"result\":";
     payload += result;
@@ -704,7 +776,8 @@ void McpServer::ReplyResult(int id, const std::string& result) {
     Application::GetInstance().SendMcpMessage(payload);
 }
 
-void McpServer::ReplyError(int id, const std::string& message) {
+void McpServer::ReplyError(int id, const std::string &message)
+{
     std::string payload = "{\"jsonrpc\":\"2.0\",\"id\":";
     payload += std::to_string(id);
     payload += ",\"error\":{\"message\":\"";
@@ -713,112 +786,139 @@ void McpServer::ReplyError(int id, const std::string& message) {
     Application::GetInstance().SendMcpMessage(payload);
 }
 
-void McpServer::GetToolsList(int id, const std::string& cursor, bool list_user_only_tools) {
+void McpServer::GetToolsList(int id, const std::string &cursor, bool list_user_only_tools)
+{
     const int max_payload_size = 8000;
     std::string json = "{\"tools\":[";
-    
+
     bool found_cursor = cursor.empty();
     auto it = tools_.begin();
     std::string next_cursor = "";
-    
-    while (it != tools_.end()) {
+
+    while (it != tools_.end())
+    {
         // 如果我们还没有找到起始位置，继续搜索
-        if (!found_cursor) {
-            if ((*it)->name() == cursor) {
+        if (!found_cursor)
+        {
+            if ((*it)->name() == cursor)
+            {
                 found_cursor = true;
-            } else {
+            }
+            else
+            {
                 ++it;
                 continue;
             }
         }
 
-        if (!list_user_only_tools && (*it)->user_only()) {
+        if (!list_user_only_tools && (*it)->user_only())
+        {
             ++it;
             continue;
         }
-        
+
         // 添加tool前检查大小
         std::string tool_json = (*it)->to_json() + ",";
-        if (json.length() + tool_json.length() + 30 > max_payload_size) {
+        if (json.length() + tool_json.length() + 30 > max_payload_size)
+        {
             // 如果添加这个tool会超出大小限制，设置next_cursor并退出循环
             next_cursor = (*it)->name();
             break;
         }
-        
+
         json += tool_json;
         ++it;
     }
-    
-    if (json.back() == ',') {
+
+    if (json.back() == ',')
+    {
         json.pop_back();
     }
-    
-    if (json.back() == '[' && !tools_.empty()) {
+
+    if (json.back() == '[' && !tools_.empty())
+    {
         // 如果没有添加任何tool，返回错误
         ESP_LOGE(TAG, "tools/list: Failed to add tool %s because of payload size limit", next_cursor.c_str());
         ReplyError(id, "Failed to add tool " + next_cursor + " because of payload size limit");
         return;
     }
 
-    if (next_cursor.empty()) {
+    if (next_cursor.empty())
+    {
         json += "]}";
-    } else {
+    }
+    else
+    {
         json += "],\"nextCursor\":\"" + next_cursor + "\"}";
     }
-    
+
     ReplyResult(id, json);
 }
 
-void McpServer::DoToolCall(int id, const std::string& tool_name, const cJSON* tool_arguments) {
-    auto tool_iter = std::find_if(tools_.begin(), tools_.end(), 
-                                 [&tool_name](const McpTool* tool) { 
-                                     return tool->name() == tool_name; 
-                                 });
-    
-    if (tool_iter == tools_.end()) {
+void McpServer::DoToolCall(int id, const std::string &tool_name, const cJSON *tool_arguments)
+{
+    auto tool_iter = std::find_if(tools_.begin(), tools_.end(),
+                                  [&tool_name](const McpTool *tool)
+                                  {
+                                      return tool->name() == tool_name;
+                                  });
+
+    if (tool_iter == tools_.end())
+    {
         ESP_LOGE(TAG, "tools/call: Unknown tool: %s", tool_name.c_str());
         ReplyError(id, "Unknown tool: " + tool_name);
         return;
     }
 
     PropertyList arguments = (*tool_iter)->properties();
-    try {
-        for (auto& argument : arguments) {
+    try
+    {
+        for (auto &argument : arguments)
+        {
             bool found = false;
-            if (cJSON_IsObject(tool_arguments)) {
+            if (cJSON_IsObject(tool_arguments))
+            {
                 auto value = cJSON_GetObjectItem(tool_arguments, argument.name().c_str());
-                if (argument.type() == kPropertyTypeBoolean && cJSON_IsBool(value)) {
+                if (argument.type() == kPropertyTypeBoolean && cJSON_IsBool(value))
+                {
                     argument.set_value<bool>(value->valueint == 1);
                     found = true;
-                } else if (argument.type() == kPropertyTypeInteger && cJSON_IsNumber(value)) {
+                }
+                else if (argument.type() == kPropertyTypeInteger && cJSON_IsNumber(value))
+                {
                     argument.set_value<int>(value->valueint);
                     found = true;
-                } else if (argument.type() == kPropertyTypeString && cJSON_IsString(value)) {
+                }
+                else if (argument.type() == kPropertyTypeString && cJSON_IsString(value))
+                {
                     argument.set_value<std::string>(value->valuestring);
                     found = true;
                 }
             }
 
-            if (!argument.has_default_value() && !found) {
+            if (!argument.has_default_value() && !found)
+            {
                 ESP_LOGE(TAG, "tools/call: Missing valid argument: %s", argument.name().c_str());
                 ReplyError(id, "Missing valid argument: " + argument.name());
                 return;
             }
         }
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception &e)
+    {
         ESP_LOGE(TAG, "tools/call: %s", e.what());
         ReplyError(id, e.what());
         return;
     }
 
     // Use main thread to call the tool
-    auto& app = Application::GetInstance();
-    app.Schedule([this, id, tool_iter, arguments = std::move(arguments)]() {
+    auto &app = Application::GetInstance();
+    app.Schedule([this, id, tool_iter, arguments = std::move(arguments)]()
+                 {
         try {
             ReplyResult(id, (*tool_iter)->Call(arguments));
         } catch (const std::exception& e) {
             ESP_LOGE(TAG, "tools/call: %s", e.what());
             ReplyError(id, e.what());
-        }
-    });
+        } });
 }

@@ -391,9 +391,9 @@ void Application::Start() {
     board.StartNetwork();
 
     music_ = new Esp32Music();
-    if (music_ != nullptr) {
-        music_->Initialize();
-    }
+    // if (music_ != nullptr) {
+    //     music_->Initialize();
+    // }
 
     radio_ = new Esp32Radio();
     if (radio_ != nullptr) {
