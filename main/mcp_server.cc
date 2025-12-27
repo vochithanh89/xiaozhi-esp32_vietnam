@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <cstring>
 #include <esp_pthread.h>
-#include <qrcode.h>
 
 #include "application.h"
 #include "display.h"
@@ -60,82 +59,6 @@ void McpServer::AddCommonTools()
             [&board](const PropertyList &properties) -> ReturnValue
             {
                 return board.GetDeviceStatusJson();
-            });
-
-    AddTool("self.network.ip2qrcode",
-            "Print the QR code of the IP address connected to WiFi network.\n"
-            "Use this tool when user asks about network connection, IP address and print QR code.\n"
-            "Returns the new IP address, SSID, and connection status. Also displays IP address as QR code on LCD screen.",
-            PropertyList(),
-            [&board](const PropertyList &properties) -> ReturnValue
-            {
-                auto &wifi_station = WifiStation::GetInstance();
-                ESP_LOGI(TAG, "Getting network status for IP address tool");
-                cJSON *json = cJSON_CreateObject();
-                cJSON_AddBoolToObject(json, "connected", wifi_station.IsConnected());
-
-                if (wifi_station.IsConnected())
-                {
-                    std::string ip_address = wifi_station.GetIpAddress();
-                    cJSON_AddStringToObject(json, "ip_address", ip_address.c_str());
-                    cJSON_AddStringToObject(json, "ssid", wifi_station.GetSsid().c_str());
-                    cJSON_AddNumberToObject(json, "rssi", wifi_station.GetRssi());
-                    cJSON_AddNumberToObject(json, "channel", wifi_station.GetChannel());
-                    cJSON_AddStringToObject(json, "mac_address", SystemInfo::GetMacAddress().c_str());
-                    cJSON_AddStringToObject(json, "status", "connected");
-
-                    // Generate and display QR code for IP address
-                    auto display = board.GetDisplay();
-                    if (display)
-                    {
-                        ESP_LOGI(TAG, "Generating QR code for IP address: %s", ip_address.c_str());
-                        if (display->QRCodeIsSupported())
-                        {
-                            ip_address += "";
-                            display->SetIpAddress(ip_address);
-                            // Capture display pointer for callback
-                            static Display *s_display = display;
-                            esp_qrcode_config_t qrcode_cfg = {
-                                .display_func = [](esp_qrcode_handle_t qrcode)
-                                {
-                                    if (s_display && qrcode)
-                                    {
-                                        s_display->DisplayQRCode(qrcode, nullptr);
-                                    }
-                                },
-                                .max_qrcode_version = 10,
-                                .qrcode_ecc_level = ESP_QRCODE_ECC_MED};
-
-                            // Create URL format for QR code
-                            std::string qr_text = "http://" + ip_address;
-                            esp_err_t err = esp_qrcode_generate(&qrcode_cfg, qr_text.c_str());
-                            if (err == ESP_OK)
-                            {
-                                ESP_LOGI(TAG, "QR code generated and displayed for IP: %s", ip_address.c_str());
-                                cJSON_AddBoolToObject(json, "qrcode_displayed", true);
-                            }
-                            else
-                            {
-                                ESP_LOGE(TAG, "Failed to generate QR code for IP address");
-                                cJSON_AddBoolToObject(json, "qrcode_displayed", false);
-                            }
-                        }
-                        else
-                        {
-                            display->SetChatMessage("assistant", ip_address.c_str());
-                            vTaskDelay(pdMS_TO_TICKS(5000));
-                            ESP_LOGW(TAG, "Display does not support QR code");
-                            cJSON_AddBoolToObject(json, "qrcode_displayed", false);
-                        }
-                    }
-                    else
-                    {
-                        cJSON_AddStringToObject(json, "status", "disconnected");
-                        cJSON_AddStringToObject(json, "message", "Device is not connected to WiFi");
-                    }
-                }
-
-                return json;
             });
 
     AddTool("self.audio_speaker.set_volume",

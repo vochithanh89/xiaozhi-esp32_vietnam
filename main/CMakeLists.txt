@@ -68,6 +68,7 @@ set(BUILTIN_ICON_FONT font_awesome_14_1)
 # Set default assets if the board uses partition table V2
 if(CONFIG_BOARD_TYPE_CT03DEV_ZHENGCHEN_1_54TFT_WIFI)
     set(BOARD_TYPE "ct03dev-zhengchen-1.54tft-wifi")
+    set(BOARD_NAME "ct03dev-assistant")
     set(BUILTIN_TEXT_FONT font_puhui_basic_20_4)
     set(BUILTIN_ICON_FONT font_awesome_20_4)
     set(DEFAULT_EMOJI_COLLECTION twemoji_32)
